@@ -145,6 +145,23 @@ export function bulkRule(state,{type,from,to,rate,minStay,stopSell,cta,ctd}) {
   logs(next,'Updated '+type+' pricing and restrictions · '+from+' to '+to);
   return next;
 }
+export function updateRoom(state,{roomId,name,rate,status},today=iso(new Date())) {
+  const current=state.rooms.find(r=>r.id===roomId);
+  if(!current)throw new Error('Room not found.');
+  const cleanName=str(name);
+  if(cleanName.length<2||cleanName.length>70)throw new Error('Room name must be 2–70 characters.');
+  const amount=Number(rate);
+  if(!Number.isFinite(amount)||amount<0||amount>100000000)throw new Error('Enter a valid nightly rate.');
+  if(!['Ready','Maintenance'].includes(status))throw new Error('Invalid room status.');
+  if(status==='Maintenance'&&state.bookings.some(b=>b.roomId===roomId&&b.status!=='Cancelled'&&b.checkOut>today)){
+    throw new Error('The room has upcoming or in-house reservations. Move or cancel them first.');
+  }
+  const next=deep(state);
+  const target=next.rooms.find(r=>r.id===roomId);
+  target.name=cleanName;target.rate=amount;target.status=status;
+  logs(next,'Updated room '+roomId+' · '+cleanName+' · '+status);
+  return next;
+}
 export function blockRoom(state,{roomId,start,end,reason}) {
   if(!state.rooms.some(r=>r.id===roomId))throw new Error('Unknown room.');
   if(!isDate(start)||!isDate(end)||nights(start,end)<1)throw new Error('Invalid block dates.');
