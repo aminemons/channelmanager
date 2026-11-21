@@ -47,6 +47,8 @@ jobs:
           (root / 'index.html').write_text(index)
           app=(root/'app.js').read_text()
           app=app.replace("location.pathname==='/app'","location.hash==='#app'")
+          app=app.replace("location.pathname!=='/app'","location.hash!=='#app'")
+          app=app.replace("history.pushState({},'','/app')","history.pushState({},'','#app')")
           app=app.replace("p==='app'?'/app':'/'","p==='app'?'#app':'#'")
           app=app.replace('href="/app"','href="#app"').replace('href="/"','href="#"')
           (root/'app.js').write_text(app)
