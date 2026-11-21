@@ -26,6 +26,14 @@ test('operational workspace renders its six views and reservation editor',async(
     ['operations','Maintenance blocks'],['inventory','Inventory matrix']]){
     click({nav:key});assert.match(root.innerHTML,new RegExp(text),key);
   }
+  click({nav:'distribution'});
+  assert.match(root.innerHTML,/Calendar exchange/);
+  click({action:'import-ical'});
+  assert.match(root.innerHTML,/Import iCalendar/);
+  click({action:'close-modal'});
+  click({action:'export-ical'});
+  assert.match(root.innerHTML,/Export room calendar/);
+  click({action:'close-modal'});
   click({action:'new-booking'});
   assert.match(root.innerHTML,/New reservation/);
   const emailInput=root.innerHTML.match(/<input name="email"[^>]*>/)?.[0];
