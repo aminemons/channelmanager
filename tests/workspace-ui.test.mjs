@@ -22,12 +22,12 @@ test('operational workspace renders its six views and reservation editor',async(
   }
   for(const [key,text] of [
     ['overview','Needs attention'],['calendar','Room allocation'],
-    ['reservations','Booking register'],['distribution','Channel room mapping'],
+    ['reservations','Booking register'],['distribution','Room & rate-plan mapping'],
     ['operations','Maintenance blocks'],['performance','Daily availability & revenue'],['inventory','Inventory matrix']]){
     click({nav:key});assert.match(root.innerHTML,new RegExp(text),key);
   }
   click({nav:'distribution'});
-  assert.match(root.innerHTML,/Calendar exchange/);
+  assert.match(root.innerHTML,/Manual calendar exchange/);
   click({action:'import-ical'});
   assert.match(root.innerHTML,/Import iCalendar/);
   click({action:'close-modal'});
