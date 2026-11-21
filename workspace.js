@@ -1,5 +1,6 @@
 import {iso,addDays,nights} from './hotel.mjs';
 import {iCalImportPreview,writeICal} from './calendar-exchange.mjs';
+import {dashboardNumbers,mappingAudit,rateComparison,workQueue,scheduledArrivals} from './decision-engine.mjs';
 import {TYPES,CHANNELS_EXTERNAL,fresh,hydrate,availableCount,allTypeRooms,getRule,rateFor,quoteStay,reserve,changeStatus,bulkRule,blockRoom,unblock,channelMap,feedRows,toCSV,importPreview,sampleCSV,availableCandidateIds} from './workspace-core.mjs';
 
 const STORE='homa.workspace.v2';
@@ -10,7 +11,7 @@ try {
   const raw=localStorage.getItem(STORE) || localStorage.getItem(OLD);
   state=hydrate(raw?JSON.parse(raw):null,now);
 }catch(e){state=fresh(now);}
-const ui={view:'inventory',start:now,days:12,modal:null,channel:'Booking.com',search:'',filter:'All',notice:'',preview:null};
+const ui={view:'overview',start:now,days:12,modal:null,channel:'Booking.com',search:'',filter:'All',notice:'',preview:null};
 const root=document.getElementById('root');
 const money=(n)=>new Intl.NumberFormat('fr-DZ',{maximumFractionDigits:0}).format(Number(n)||0)+' DA';
 const fmt=(d)=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
@@ -38,11 +39,13 @@ const ic=(name,size=18)=>{
     info:'<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7h.01"/>',
     hotel:'<rect x="5" y="2" width="14" height="20" rx="1"/><path d="M9 7h2m2 0h2M9 11h2m2 0h2M9 15h6M10 22v-4h4v4"/>',
     log:'<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/>',
-    alert:'<path d="m12 2 10 18H2zM12 9v5M12 17h.01"/>'
+    alert:'<path d="m12 2 10 18H2zM12 9v5M12 17h.01"/>',
+    chart:'<path d="M4 19h16M6 16V9m6 7V5m6 11v-6" stroke-linecap="round"/>',
+    zap:'<path d="m13 2-9 11h7l-1 9 10-12h-7z"/>'
   };
   return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+(paths[name]||paths.info)+'</svg>';
 };
-const navs=[['overview','grid','Overview'],['inventory','layers','Availability & rates'],['calendar','cal','Room calendar'],['reservations','bed','Reservations'],['distribution','globe','Distribution'],['operations','log','Operations']];
+const navs=[['overview','grid','Control desk'],['inventory','layers','Inventory & rates'],['calendar','cal','Room calendar'],['reservations','bed','Reservations'],['distribution','globe','Channels'],['performance','chart','Performance'],['operations','log','Operations']];
 const room=(id)=>state.rooms.find(r=>r.id===id);
 function save(next,message='Saved'){
   state=next;
@@ -83,28 +86,33 @@ function renderView(){
     case 'calendar':return calendar();
     case 'reservations':return reservations();
     case 'distribution':return distribution();
+    case 'performance':return performance();
     case 'operations':return operations();
     default:return inventory();
   }
 }
 function overview(){
-  const total=state.rooms.filter(r=>r.status!=='Maintenance').length;
-  const occupied=state.bookings.filter(b=>b.status!=='Cancelled'&&b.checkIn<=now&&now<b.checkOut).length;
-  const arr=state.bookings.filter(b=>b.status==='Confirmed'&&b.checkIn===now);
-  const dep=state.bookings.filter(b=>b.status==='Checked in'&&b.checkOut===now);
-  const coming=state.bookings.filter(b=>b.status==='Confirmed'&&b.checkIn>=now).sort((a,b)=>a.checkIn.localeCompare(b.checkIn)).slice(0,6);
-  const external=state.bookings.filter(b=>b.status!=='Cancelled'&&CHANNELS_EXTERNAL.includes(b.channel)).length;
-  return head('Today at '+state.hotelName,'The bookings and inventory decisions that need attention.',primary('New reservation','new-booking'))+
+  const stats=dashboardNumbers(state,now,14),tasks=workQueue(state,now),arrivals=scheduledArrivals(state,now,7);
+  const totalTonight=stats.details[0];
+  const metric=(label,value,extra)=>'<div class="metric"><span>'+label+'</span><strong>'+value+'</strong><small>'+extra+'</small></div>';
+  const queue=tasks.map(t=>'<button type="button" class="queue-row" data-action="task-go" data-target="'+esc(t.action)+'" data-channel="'+esc(t.channel||'')+'">'+
+    '<span class="queue-level '+esc(t.level)+'" aria-hidden="true"></span><span class="queue-copy"><strong>'+esc(t.title)+'</strong><small>'+esc(t.body)+'</small></span><span class="queue-arrow">'+ic('arrow',15)+'</span></button>').join('');
+  const guests=arrivals.map(b=>'<button type="button" class="arrival-link" data-action="edit-booking" data-id="'+esc(b.id)+'"><span class="arrival-date"><strong>'+fmt(b.checkIn)+'</strong><small>'+weekday(b.checkIn)+'</small></span><span class="arrival-guest"><strong>'+esc(b.guest)+'</strong><small>'+esc(b.channel)+' · Room '+esc(b.roomId)+' · '+nights(b.checkIn,b.checkOut)+' nights</small></span>'+ic('arrow',15)+'</button>').join('');
+  return head('Control desk','Today’s bookings, distribution setup and inventory decisions.',primary('New reservation','new-booking')+
+    button('Edit rates '+ic('arrow',15),'go-inventory','','button button-subtle'))+
+  '<div class="desk-headline"><span>'+weekday(now)+', '+fmt(now)+' · '+now.slice(0,4)+'</span><strong>'+esc(state.hotelName)+'</strong><small>Demo data · Browser only · No connected channels</small></div>'+
   '<div class="metrics">'+
-  '<div class="metric"><span>Occupied tonight</span><strong>'+occupied+' <i>/ '+total+'</i></strong><small>'+Math.round(occupied/Math.max(total,1)*100)+'% occupancy</small></div>'+
-  '<div class="metric"><span>Expected arrivals</span><strong>'+arr.length+'</strong><small>Confirmed for today</small></div>'+
-  '<div class="metric"><span>Expected departures</span><strong>'+dep.length+'</strong><small>Scheduled for today</small></div>'+
-  '<div class="metric"><span>OTA reservations</span><strong>'+external+'</strong><small>Manually recorded, not synced</small></div></div>'+
-  '<div class="split"><section class="surface"><div class="surface-header"><div><h2>Upcoming arrivals</h2><p>Bookings requiring front-desk attention</p></div>'+button('View all '+ic('arrow',15),'go-reservations','','text-action')+'</div>'+
-  '<div class="simple-list">'+(coming.length?coming.map(b=>'<div class="arrival-row"><div><strong>'+esc(b.guest)+'</strong><small>'+esc(b.id)+' · Room '+esc(b.roomId)+' · '+esc(b.channel)+'</small></div><span>'+fmt(b.checkIn)+'</span>'+button('Open','edit-booking','data-id="'+esc(b.id)+'"','button button-subtle')+'</div>').join(''):'<p class="empty">No upcoming arrivals.</p>')+'</div></section>'+
-  '<section class="surface"><div class="surface-header"><div><h2>Availability next 7 days</h2><p>Remaining rooms by date</p></div>'+button('Open matrix '+ic('arrow',15),'go-inventory','','text-action')+'</div>'+
-  '<div class="availability-list">'+Array.from({length:7},(_,i)=>{const d=addDays(now,i),c=TYPES.reduce((sum,t)=>sum+availableCount(state,t,d),0);return '<div><span>'+weekday(d)+' '+fmt(d)+'</span><div class="availability-track"><i style="width:'+(100*c/Math.max(total,1))+'%"></i></div><strong>'+c+' left</strong></div>';}).join('')+'</div></section></div>'+
-  '<div class="inline-prompt">'+ic('info',18)+'<div><strong>Distribution isn’t connected to booking websites yet.</strong><p>Use the distribution page to map room types and export a rate and availability sheet. No platform updates happen automatically.</p></div>'+button('Distribution '+ic('arrow',15),'go-distribution','','button button-subtle')+'</div>';
+    metric('Occupied tonight',totalTonight.occupied+' / '+totalTonight.capacity,totalTonight.available+' rooms available tonight')+
+    metric('Forward occupancy',stats.occupancy+'%','Booked room-nights · next 14 nights')+
+    metric('Average daily rate',money(stats.adr),'From confirmed/active reservations')+
+    metric('Booked room revenue',money(stats.roomRevenue),'For occupied nights in next 14 days')+
+  '</div>'+
+  '<div class="desk-columns"><section class="surface"><div class="surface-header"><div><h2>Needs attention</h2><p>Tasks calculated from your actual workspace data.</p></div><span class="quiet-count">'+tasks.length+' items</span></div>'+
+    '<div class="queue-list">'+(queue||'<div class="empty">No action required right now.</div>')+'</div></section>'+
+    '<section class="surface"><div class="surface-header"><div><h2>Upcoming arrivals</h2><p>Confirmed reservations in the next seven days.</p></div>'+button('All reservations '+ic('arrow',15),'go-reservations','','text-action')+'</div>'+
+    '<div class="arrival-links">'+(guests||'<div class="empty">No arrivals scheduled.</div>')+'</div></section></div>'+
+  '<section class="surface outlook"><div class="surface-header"><div><h2>14-night occupancy outlook</h2><p>Booked nights out of available physical room inventory. No demand forecast is assumed.</p></div>'+button('Open performance '+ic('arrow',15),'go-performance','','text-action')+'</div>'+
+    '<div class="outlook-days">'+stats.details.map(d=>'<div class="outlook-day" title="'+d.day+': '+d.occupied+' occupied / '+d.capacity+' sellable"><small>'+weekday(d.day)+'</small><strong>'+fmt(d.day)+'</strong><div class="outlook-bar"><i style="height:'+d.occupancy+'%"></i></div><b>'+d.occupancy+'%</b></div>').join('')+'</div></section>';
 }
 function inventory(){
   const dates=Array.from({length:ui.days},(_,i)=>addDays(ui.start,i));
@@ -167,21 +175,51 @@ function reservations(){
   '<div class="table-scroll"><table class="register"><thead><tr><th>Guest / reference</th><th>Room</th><th>Arrival</th><th>Departure</th><th>Source</th><th>Status</th><th class="right">Actions</th></tr></thead><tbody>'+ (rows||'<tr><td colspan="7" class="empty">No reservations match these filters.</td></tr>')+'</tbody></table></div></section>';
 }
 function distribution(){
+  const audit=mappingAudit(state),comparison=rateComparison(state,ui.start);
+  const cards=audit.byChannel.map(c=>'<button type="button" class="channel-health '+(ui.channel===c.channel?'selected':'')+'" data-action="select-channel" data-channel="'+esc(c.channel)+'">'+
+    '<span><strong>'+esc(c.channel)+'</strong><small>Offline · Mapping only</small></span>'+
+    '<span class="channel-numbers"><strong>'+c.configured+' / '+c.required+'</strong><small>room types mapped</small></span></button>').join('');
   const rows=TYPES.map(type=>{
     const config=state.mappings[ui.channel+'|'+type]||{remoteId:'',adjustment:0};
-    return '<tr><td><strong>'+type+'</strong><small>'+allTypeRooms(state,type)+' rooms in inventory</small></td><td>'+ (config.remoteId?'<span class="mapping-id">'+esc(config.remoteId)+'</span>':'<span class="unmapped">Not mapped</span>')+'</td><td>'+(config.adjustment>=0?'+':'')+config.adjustment+'%</td><td>'+money(Math.round(rateFor(state,type,now)*(1+Number(config.adjustment)/100)))+'</td><td class="right">'+button('Edit mapping','map-channel','data-type="'+type+'"','text-action')+'</td></tr>';
+    return '<tr><td><strong>'+type+'</strong><small>'+allTypeRooms(state,type)+' rooms in inventory</small></td><td>'+ (config.remoteId?'<span class="mapping-id">'+esc(config.remoteId)+'</span>':'<span class="unmapped">Needs mapping</span>')+'</td><td>'+(Number(config.adjustment)>=0?'+':'')+config.adjustment+'%</td><td>'+money(Math.round(rateFor(state,type,ui.start)*(1+Number(config.adjustment)/100)))+'</td><td class="right">'+button('Configure','map-channel','data-type="'+type+'"','text-action')+'</td></tr>';
   }).join('');
-  const feed=feedRows(state,ui.channel,ui.start,3).slice(0,9);
-  const prev=feed.map(x=>'<tr><td>'+esc(x.roomType)+'</td><td>'+fmt(x.date)+'</td><td>'+x.available+'</td><td>'+money(x.rate)+'</td><td>'+x.minStay+'</td><td>'+esc(x.stopSell)+'</td></tr>').join('');
-  return head('Distribution','Configure room-type mapping and inspect the export before connecting an OTA.',button(ic('export',16)+' Export 14-day ARI CSV','export-ari','','button button-primary'))+
-  '<div class="context-note">'+ic('info',18)+'<div><strong>No OTA API connection is configured.</strong><p>These mappings and ARI exports are local. They do not publish prices or reservations to Booking.com, Airbnb or Expedia.</p></div></div>'+
-  '<section class="surface"><div class="table-toolbar"><div><h2>Channel room mapping</h2><p>Assign each internal room type to its corresponding channel rate-plan identifier.</p></div><select id="channel-select" aria-label="Select channel">'+CHANNELS_EXTERNAL.map(c=>'<option '+(c===ui.channel?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>'+
-  '<div class="table-scroll"><table class="register"><thead><tr><th>Internal room type</th><th>External plan ID</th><th>Rate adjustment</th><th>Channel rate today</th><th class="right">Manage</th></tr></thead><tbody>'+rows+'</tbody></table></div></section>'+
-  '<section class="surface feed-surface"><div class="surface-header"><div><h2>Availability, rates & restrictions</h2><p>Read-only preview of the data this property can prepare for a future integration.</p></div>'+dateBar()+'</div>'+
-  '<div class="table-scroll"><table class="register compact"><thead><tr><th>Room type</th><th>Date</th><th>Available</th><th>Rate</th><th>Min stay</th><th>Stop sell</th></tr></thead><tbody>'+prev+'</tbody></table></div></section>'+
-  '<section class="surface calendar-exchange"><div><h2>Calendar exchange</h2><p>Import and export room availability as standard .ics files. Manual exchange only — no live calendar subscription.</p></div><div class="exchange-actions">'+
-  button('Import calendar (.ics)','import-ical','','button button-subtle')+
-  button(ic('export',16)+' Export room calendar','export-ical','','button button-subtle')+'</div></section>';
+  const comparisonRows=comparison.map(c=>'<tr><td><strong>'+esc(c.type)+'</strong><small>'+c.available+' rooms available</small></td><td>'+money(c.base)+'</td>'+
+    c.channels.map(p=>'<td>'+money(p.rate)+'<small>'+(p.mapped?'Configured markup: '+(p.adjustment>=0?'+':'')+p.adjustment+'%':'Not mapped · Preview')+'</small></td>').join('')+'</tr>').join('');
+  return head('Channel distribution','Configure and audit what would be sent to booking channels. No real connection is active.',
+    button(ic('export',16)+' Export ARI CSV','export-ari','','button button-primary'))+
+  '<div class="connection-state"><span class="connection-indicator"></span><div><strong>No channels connected</strong><p>All three OTA connections require partner-approved access, credentials and a server integration. Local mapping and exports cannot publish inventory.</p></div></div>'+
+  '<div class="health-grid">'+cards+'</div>'+
+  '<section class="surface"><div class="table-toolbar"><div><h2>Room & rate-plan mapping</h2><p>Map every internal room category to the identifiers supplied by each channel.</p></div><select id="channel-select" aria-label="Select channel">'+CHANNELS_EXTERNAL.map(c=>'<option '+(c===ui.channel?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>'+
+  '<div class="table-scroll"><table class="register"><thead><tr><th>Internal room type</th><th>Channel plan ID</th><th>Rate adjustment</th><th>Proposed nightly rate</th><th class="right">Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></section>'+
+  '<section class="surface feed-surface"><div class="surface-header"><div><h2>Rate comparison · '+fmt(ui.start)+'</h2><p>Expected prices based on your configured markups. Not actual OTA listing prices.</p></div>'+dateBar()+'</div>'+
+  '<div class="table-scroll"><table class="register comparison-table"><thead><tr><th>Room type</th><th>Base rate</th>'+CHANNELS_EXTERNAL.map(c=>'<th>'+esc(c)+'</th>').join('')+'</tr></thead><tbody>'+comparisonRows+'</tbody></table></div></section>'+
+  '<section class="surface calendar-exchange"><div><h2>Manual calendar exchange</h2><p>Import or export room availability using .ics files. Exchange is not subscribed or synchronized automatically.</p></div><div class="exchange-actions">'+
+  button('Import .ics','import-ical','','button button-subtle')+
+  button(ic('export',16)+' Export room .ics','export-ical','','button button-subtle')+'</div></section>';
+}
+function performance(){
+  const stats=dashboardNumbers(state,ui.start,14);
+  const metric=(label,value,extra)=>'<div class="metric"><span>'+label+'</span><strong>'+value+'</strong><small>'+extra+'</small></div>';
+  const daily=stats.details.map(d=>'<tr><td><strong>'+weekday(d.day)+', '+fmt(d.day)+'</strong></td><td>'+d.capacity+'</td><td>'+d.occupied+'</td><td>'+d.available+'</td>'+
+    '<td><div class="cell-gauge"><i style="width:'+d.occupancy+'%"></i></div>'+d.occupancy+'%</td><td class="right">'+money(d.revenue)+'</td></tr>').join('');
+  const mix=stats.channelMix.map(c=>'<tr><td><strong>'+esc(c.channel)+'</strong></td><td>'+c.bookings+'</td><td>'+c.roomNights+'</td><td class="right">'+money(c.revenue)+'</td></tr>').join('');
+  const types=stats.roomMix.map(c=>'<tr><td><strong>'+esc(c.type)+'</strong></td><td>'+c.rooms+'</td><td>'+c.roomNights+'</td><td class="right">'+money(c.revenue)+'</td></tr>').join('');
+  return head('Performance','Booked revenue and occupancy calculated from the current reservation ledger.',
+    button(ic('export',16)+' Export report','export-report','','button button-primary'))+
+  '<div class="performance-toolbar"><div><strong>Reporting window</strong><p>14 nights starting '+fmt(ui.start)+', '+ui.start.slice(0,4)+'</p></div>'+dateBar()+'</div>'+
+  '<div class="metrics">'+
+    metric('Occupancy',stats.occupancy+'%',stats.occupiedRoomNights+' of '+stats.inventoryRoomNights+' room-nights occupied')+
+    metric('ADR',money(stats.adr),'Booked room revenue / booked room-nights')+
+    metric('RevPAR',money(stats.revpar),'Booked revenue / sellable room-nights')+
+    metric('Booked room revenue',money(stats.roomRevenue),'Future/past room-nights in selected window')+
+  '</div>'+
+  '<div class="reports-layout"><section class="surface"><div class="surface-header"><div><h2>Daily availability & revenue</h2><p>Calculated from reservations and room blocks.</p></div></div>'+
+    '<div class="table-scroll"><table class="register compact"><thead><tr><th>Night</th><th>Sellable</th><th>Booked</th><th>Available</th><th>Occupancy</th><th class="right">Booked revenue</th></tr></thead><tbody>'+daily+'</tbody></table></div></section>'+
+    '<div class="reports-aside"><section class="surface"><div class="surface-header"><div><h2>Revenue by source</h2><p>Allocated by occupied room-night, not payment collected.</p></div></div>'+
+      '<div class="table-scroll"><table class="register compact"><thead><tr><th>Source</th><th>Bookings</th><th>Nights</th><th class="right">Revenue</th></tr></thead><tbody>'+(mix||'<tr><td colspan="4" class="empty">No bookings in this period.</td></tr>')+'</tbody></table></div></section>'+
+    '<section class="surface"><div class="surface-header"><div><h2>Revenue by room type</h2><p>Booked value based on rates stored with stays.</p></div></div>'+
+      '<div class="table-scroll"><table class="register compact"><thead><tr><th>Type</th><th>Rooms</th><th>Nights</th><th class="right">Revenue</th></tr></thead><tbody>'+types+'</tbody></table></div></section></div></div>'+
+  '<p class="report-footnote">Methodology: rates are per reservation per night; cancellations are excluded, and maintenance blocks reduce sellable room-night capacity. No tax, fee, payment, demand or market-rate data is inferred.</p>';
 }
 function operations(){
   const blocks=[...state.blocks].sort((a,b)=>a.start.localeCompare(b.start));
@@ -306,7 +344,9 @@ function action(name,el) {
     switch(name){
       case 'close-modal':ui.modal=null;ui.preview=null;render();break;
       case 'clear-notice':ui.notice='';render();break;
-      case 'go-inventory':case 'go-reservations':case 'go-distribution':setView(name.slice(3));break;
+      case 'go-inventory':case 'go-reservations':case 'go-distribution':case 'go-performance':setView(name.slice(3));break;
+      case 'task-go':{if(el.dataset.channel)ui.channel=el.dataset.channel;setView(el.dataset.target);break;}
+      case 'select-channel':ui.channel=el.dataset.channel;render();break;
       case 'date-prev':ui.start=addDays(ui.start,-ui.days);render();break;
       case 'date-next':ui.start=addDays(ui.start,ui.days);render();break;
       case 'date-today':ui.start=now;render();break;
@@ -350,6 +390,7 @@ function action(name,el) {
         const updated=ui.preview.staged;const c=ui.preview.accepted.length;
         ui.modal=null;ui.preview=null;save(updated,c+' reservations imported.');break;
       }
+      case 'export-report':download('homa-performance-'+ui.start+'.csv',toCSV(dashboardNumbers(state,ui.start,14).details),'text/csv;charset=utf-8');alertUser('Performance report exported from current booking data.');break;
       case 'export-ari':download('homa-'+ui.channel.toLowerCase().replace(/\W+/g,'-')+'-ari.csv',toCSV(feedRows(state,ui.channel,ui.start,14)),'text/csv;charset=utf-8');alertUser('Offline ARI CSV exported. No OTA has been updated.');break;
       case 'export-backup':download('homa-backup-'+now+'.json',JSON.stringify(state,null,2),'application/json');alertUser('Workspace backup exported.');break;
       case 'export-reservations':download('homa-reservations-'+now+'.csv',toCSV(state.bookings.map(b=>({id:b.id,guest:b.guest,room:b.roomId,checkIn:b.checkIn,checkOut:b.checkOut,channel:b.channel,status:b.status,externalRef:b.externalRef||'',guests:b.guests,rate:b.rate}))), 'text/csv');break;
