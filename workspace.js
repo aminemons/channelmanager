@@ -11,7 +11,7 @@ try {
   const raw=localStorage.getItem(STORE) || localStorage.getItem(OLD);
   state=hydrate(raw?JSON.parse(raw):null,now);
 }catch(e){state=fresh(now);}
-const ui={view:'overview',start:now,days:12,modal:null,channel:'Booking.com',search:'',filter:'All',notice:'',preview:null};
+const ui={view:'overview',mobileMenu:false,start:now,days:12,modal:null,channel:'Booking.com',search:'',filter:'All',notice:'',preview:null};
 const root=document.getElementById('root');
 const money=(n)=>new Intl.NumberFormat('fr-DZ',{maximumFractionDigits:0}).format(Number(n)||0)+' DA';
 const fmt=(d)=>new Date(d+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'});
@@ -40,6 +40,7 @@ const ic=(name,size=18)=>{
     hotel:'<rect x="5" y="2" width="14" height="20" rx="1"/><path d="M9 7h2m2 0h2M9 11h2m2 0h2M9 15h6M10 22v-4h4v4"/>',
     log:'<path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/>',
     alert:'<path d="m12 2 10 18H2zM12 9v5M12 17h.01"/>',
+    menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',
     chart:'<path d="M4 19h16M6 16V9m6 7V5m6 11v-6" stroke-linecap="round"/>',
     zap:'<path d="m13 2-9 11h7l-1 9 10-12h-7z"/>'
   };
@@ -54,7 +55,7 @@ function save(next,message='Saved'){
   render();
 }
 function alertUser(message){const d=document.querySelector?.('.dialog');if(d){let e=d.querySelector('.form-error');if(!e){e=document.createElement('div');e.className='form-error';e.setAttribute('role','alert');d.querySelector('.dialog-head').after(e);}e.textContent=message;return;}ui.notice=message;render();}
-function setView(v){ui.view=v;ui.modal=null;ui.preview=null;ui.notice='';render();}
+function setView(v){ui.view=v;ui.mobileMenu=false;ui.modal=null;ui.preview=null;ui.notice='';render();}
 function download(name,contents,type='text/plain'){
   const file=new Blob([contents],{type});
   const url=URL.createObjectURL(file);
@@ -67,9 +68,10 @@ function head(title,sub,actions=''){
 const primary=(text,action,extra='')=>button(ic('add',16)+esc(text),action,extra,'button button-primary');
 function shell(){
   return '<div class="shell">'+
-  '<aside class="sidebar"><a href="/app" class="brand" data-nav="inventory"><span class="brand-mark">H</span><span>homa<span class="brand-period">.</span></span></a>'+
+  '<aside class="sidebar"><div class="mobile-brand-row"><a href="/app" class="brand" data-nav="overview"><span class="brand-mark">H</span><span>homa<span class="brand-period">.</span></span></a>'+
+  button(ic('menu',17)+' Menu','toggle-menu','aria-expanded="'+(ui.mobileMenu?'true':'false')+'" aria-label="Open navigation"','mobile-menu-toggle')+'</div>'+
   '<div class="property-switch"><div class="property-initial">MO</div><div class="property-name"><strong>'+esc(state.hotelName)+'</strong><small>'+esc(state.location)+'</small></div></div>'+
-  '<span class="side-heading">WORKSPACE</span><nav class="nav-list">'+navs.map(n=>'<button type="button" class="nav-link '+(ui.view===n[0]?'active':'')+'" data-nav="'+n[0]+'">'+ic(n[1],17)+'<span>'+esc(n[2])+'</span></button>').join('')+'</nav>'+
+  '<span class="side-heading">WORKSPACE</span><nav class="nav-list '+(ui.mobileMenu?'is-open':'')+'">'+navs.map(n=>'<button type="button" class="nav-link '+(ui.view===n[0]?'active':'')+'" data-nav="'+n[0]+'">'+ic(n[1],17)+'<span>'+esc(n[2])+'</span></button>').join('')+'</nav>'+
   '<div class="side-bottom"><div class="local-status"><span class="tiny-square"></span>Local workspace</div><p>Data is stored in this browser. OTA accounts are not connected.</p></div></aside>'+
   '<div class="main"><div class="topbar"><div class="topbar-path">'+ic('hotel',17)+'<span>'+esc(state.hotelName)+'</span><span class="path-separator">/</span><strong>'+esc(navs.find(n=>n[0]===ui.view)?.[2]||'Workspace')+'</strong></div><div class="topbar-right"><span class="today-text">'+fmt(now)+' '+now.slice(0,4)+'</span>'+button(ic('add',16)+' New reservation','new-booking','','button button-primary button-small')+'</div></div>'+
   '<main class="main-inner">'+(ui.notice?'<div class="notice" role="status">'+ic('info',16)+esc(ui.notice)+button(ic('close',14),'clear-notice','aria-label="Dismiss"','plain-icon')+'</div>':'')+renderView()+'</main></div></div>'+renderModal();
@@ -377,6 +379,7 @@ function action(name,el) {
     switch(name){
       case 'close-modal':ui.modal=null;ui.preview=null;render();break;
       case 'clear-notice':ui.notice='';render();break;
+      case 'toggle-menu':ui.mobileMenu=!ui.mobileMenu;render();break;
       case 'go-inventory':case 'go-reservations':case 'go-distribution':case 'go-performance':setView(name.slice(3));break;
       case 'task-go':{if(el.dataset.channel)ui.channel=el.dataset.channel;setView(el.dataset.target);break;}
       case 'select-channel':ui.channel=el.dataset.channel;render();break;
