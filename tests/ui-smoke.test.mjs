@@ -31,6 +31,6 @@ test('marketing page, app dashboard, and all management views render', async () 
   assert.doesNotMatch(root.innerHTML, /<span class="badge badge-green"><span class="badge-dot"><\/span>Connected<\/span>/);
   const nav={closest(sel){return sel==='[data-nav]'?{dataset:{nav:'site'}}:null}};
   handlers.click({target:nav,preventDefault(){}});
-  assert.match(root.innerHTML, /More care/);
+  assert.match(root.innerHTML, /Every stay/);
   assert.match(root.innerHTML, /Explore the live demo/);
 });

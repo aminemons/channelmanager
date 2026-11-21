@@ -73,6 +73,18 @@ export function validateImport(input) {
  if(input.rooms.length>3000||input.bookings.length>50000) throw new Error('Backup is too large.');
  const ids=new Set();
  for(const r of input.rooms){ if(!r.id||ids.has(r.id)||!Number.isFinite(r.rate)||r.rate<0) throw new Error('Invalid room data in backup.'); ids.add(r.id); }
- for(const b of input.bookings){ if(!isDate(b.checkIn)||!isDate(b.checkOut)||nights(b.checkIn,b.checkOut)<1||!ids.has(b.roomId)||!STATUSES.includes(b.status)) throw new Error('Invalid reservation in backup.'); }
+ // Imported backups are untrusted; collisions would mislead availability and occupancy.
+ const seenBookings = new Set();
+ for (const b of input.bookings) {
+  if (!b || typeof b.id !== 'string' || seenBookings.has(b.id) || !b.id.trim()) throw new Error('Duplicate or missing reservation ID in backup.');
+  seenBookings.add(b.id);
+  if (!isDate(b.checkIn) || !isDate(b.checkOut) || nights(b.checkIn,b.checkOut)<1 || !ids.has(b.roomId) || !STATUSES.includes(b.status)) throw new Error('Invalid reservation in backup.');
+  if (typeof b.guest !== 'string' || b.guest.trim().length<2 || !CHANNELS.includes(b.channel) || !Number.isFinite(Number(b.rate)) || Number(b.rate)<0) throw new Error('Invalid guest, channel or reservation rate in backup.');
+ }
+ const occupied = input.bookings.filter(b => b.status !== 'Cancelled').sort((a,b)=>a.roomId.localeCompare(b.roomId)||a.checkIn.localeCompare(b.checkIn));
+ for (let i=1;i<occupied.length;i++) {
+  const prev=occupied[i-1], current=occupied[i];
+  if (prev.roomId===current.roomId && intersects(prev.checkIn,prev.checkOut,current.checkIn,current.checkOut)) throw new Error('Overlapping reservations in backup.');
+ }
  return input;
 }
