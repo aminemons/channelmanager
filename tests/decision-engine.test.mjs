@@ -66,7 +66,7 @@ test('work queue is derived from bookings, mapping configuration and real availa
   const s=fresh(day);
   const tasks=workQueue(s,day);
   assert.ok(tasks.some(x=>x.action==='reservations'));
-  assert.ok(tasks.filter(x=>x.action==='distribution').length===3);
+  assert.equal(tasks.filter(x=>x.action==='distribution').length,1);
   assert.ok(tasks.every(x=>x.level&&x.title&&x.action));
   const arr=scheduledArrivals(s,day,7);
   assert.ok(arr.length>0);

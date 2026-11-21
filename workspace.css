@@ -314,3 +314,9 @@ h1,h2,h3,p{margin:0}
 .report-footnote{color:#8a9eb0;font-size:10.5px;margin-top:15px;line-height:1.6}
 @media(max-width:1200px){.desk-columns,.reports-layout{grid-template-columns:1fr}.outlook-days{min-width:720px}.health-grid{gap:8px}.channel-health{padding:15px}}
 @media(max-width:850px){.desk-headline{flex-wrap:wrap;gap:7px}.desk-headline>small{margin-left:0;width:100%}.health-grid{grid-template-columns:1fr}.channel-health{padding:13px 16px}.channel-numbers{min-width:80px}.performance-toolbar{align-items:flex-start;flex-direction:column}.outlook-days{padding-left:15px;padding-right:15px}.queue-list,.arrival-links{padding:0 15px}.queue-copy small{font-size:10px}}
+
+/* Room operations should look like a register, not a tag cloud. */
+.operations-split{margin-top:20px}
+.room-offline{font-size:11px;color:#a75a47;font-weight:600}
+.room-online{font-size:11px;color:#467b67;font-weight:600}
+@media(max-width:700px){.operations-split{grid-template-columns:1fr}}

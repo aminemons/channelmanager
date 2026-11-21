@@ -12,7 +12,7 @@ A focused hotel operations prototype: the availability matrix comes first, not a
 - **CSV imports:** paste reservations, inspect accepted/rejected rows and explicitly commit the valid subset. Duplicates and occupancy conflicts are detected.
 - **Channel mapping:** locally map internal room types to external plan IDs for Booking.com, Expedia and Airbnb; configure a rate adjustment and export offline ARI CSV.
 - **iCalendar exchange:** manually import a .ics availability calendar into one room or export its occupied dates without guest names. This is NOT live syncing.
-- **Operations:** block room dates for maintenance, review a local activity log, export backup JSON, restore a backup and export reservations.
+- **Operations:** edit the physical room directory and base rates, move rooms into/out of maintenance with booking safeguards, block room dates for repairs, review a local activity log, and export/restore workspace data.
 
 ## Important limitations
 
@@ -59,3 +59,5 @@ Old app.js and styles.css remain for archival tests but are not served by the ne
 Transactional database, hotel tenancy and roles, atomic overbooking prevention, certified OTA API adapters, idempotent webhook processing, reconciliation jobs, security/a11y/browser QA, and monitored backups.
 
 This prototype is original code, not a copy of any proprietary Channel Manager.
+
+The control desk calculates its work queue from reservation lifecycle, sellable inventory and missing local mappings. The performance view computes actual booked room-nights, ADR, RevPAR, and revenue by channel from the currently stored booking records; it does not invent forecast demand or live OTA data. This remains a local demo.

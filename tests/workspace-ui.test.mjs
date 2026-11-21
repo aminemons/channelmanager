@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-test('operational workspace renders its six views and reservation editor',async()=>{
+test('operational workspace renders seven views, booking editor and room management',async()=>{
   const handlers={};
   const root={innerHTML:'',addEventListener(name,cb){handlers[name]=cb;}};
   globalThis.document={
@@ -23,7 +23,7 @@ test('operational workspace renders its six views and reservation editor',async(
   for(const [key,text] of [
     ['overview','Needs attention'],['calendar','Room allocation'],
     ['reservations','Booking register'],['distribution','Room & rate-plan mapping'],
-    ['operations','Maintenance blocks'],['performance','Daily availability & revenue'],['inventory','Inventory matrix']]){
+    ['operations','Physical room directory'],['performance','Daily availability & revenue'],['inventory','Inventory matrix']]){
     click({nav:key});assert.match(root.innerHTML,new RegExp(text),key);
   }
   click({nav:'distribution'});
@@ -44,4 +44,9 @@ test('operational workspace renders its six views and reservation editor',async(
   assert.doesNotMatch(root.innerHTML,/role="dialog"/);
   click({action:'bulk-rule'});
   assert.match(root.innerHTML,/Minimum stay/);
+  click({action:'close-modal'});
+  click({nav:'operations'});
+  click({action:'edit-room',id:'101'});
+  assert.match(root.innerHTML,/Edit room 101/);
+  assert.match(root.innerHTML,/Base nightly rate/);
 });

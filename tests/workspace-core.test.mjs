@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {addDays} from '../hotel.mjs';
-import {fresh,hydrate,TYPES,getRule,rateFor,availableCount,quoteStay,bulkRule,validateStay,reserve,changeStatus,blockRoom,unblock,channelMap,feedRows,toCSV,parseCSV,importPreview} from '../workspace-core.mjs';
+import {fresh,hydrate,TYPES,getRule,rateFor,availableCount,quoteStay,bulkRule,validateStay,reserve,changeStatus,blockRoom,unblock,updateRoom,channelMap,feedRows,toCSV,parseCSV,importPreview} from '../workspace-core.mjs';
 const start='2026-11-21',future='2027-06-10',later='2027-06-11';
 const data=()=>fresh(start);
 const candidate=(roomId='102',checkIn=future,checkOut=later)=>({guest:'Test Traveler',email:'',guests:2,roomId,checkIn,checkOut,status:'Confirmed',channel:'Direct'});
@@ -90,4 +90,24 @@ test('bad rules, invalid mapping and corrupt blocks cannot be restored',()=>{
   assert.throws(()=>hydrate(e),/invalid room blocks/i);
   const f=data();f.mappings['Booking.com|Classic']={remoteId:'X',adjustment:600};
   assert.throws(()=>hydrate(f),/invalid channel mapping/i);
+});
+
+test('room directory can change base rates without mutating existing reservation prices',()=>{
+  let state=data();
+  const original=state.bookings.find(b=>b.roomId==='103').rate;
+  state=updateRoom(state,{roomId:'103',name:'Courtyard Queen Renovated',rate:16900,status:'Ready'},start);
+  assert.equal(state.rooms.find(r=>r.id==='103').rate,16900);
+  assert.equal(state.rooms.find(r=>r.id==='103').name,'Courtyard Queen Renovated');
+  assert.equal(state.bookings.find(b=>b.roomId==='103').rate,original);
+  assert.equal(rateFor(state,'Classic',future),15200);
+});
+test('out-of-service status protects future reservations and reduces inventory',()=>{
+  const state=data();
+  assert.throws(()=>updateRoom(state,{roomId:'101',name:'Classic King',rate:15200,status:'Maintenance'},start),/upcoming|in-house/i);
+  const changed=updateRoom(state,{roomId:'203',name:'Restored Garden Studio',rate:19900,status:'Ready'},start);
+  assert.equal(changed.rooms.find(r=>r.id==='203').status,'Ready');
+  assert.equal(availableCount(changed,'Deluxe',future),3);
+  const limited=updateRoom(changed,{roomId:'203',name:'Restored Garden Studio',rate:19900,status:'Maintenance'},start);
+  assert.equal(availableCount(limited,'Deluxe',future),2);
+  assert.throws(()=>updateRoom(changed,{roomId:'203',name:'X',rate:10,status:'Ready'}),/2–70/);
 });
