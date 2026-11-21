@@ -16,5 +16,5 @@ test('Netlify release contains only public assets and works at /app', () => {
   const html=readFileSync(join(dir,'index.html'),'utf8');
   for (const path of ['/styles.css','/favicon.svg','/app.js']) assert.ok(html.includes(path),`Missing ${path}`);
   for (const asset of ['app.js','hotel.mjs','styles.css','favicon.svg']) assert.ok(existsSync(join(dir,asset)));
-  assert.match(readFileSync(join(dir,'app.js'),'utf8'),/location\.pathname==\='/app\'/);
+  assert.ok(readFileSync(join(dir, 'app.js'), 'utf8').includes("location.pathname==='/app'"));
 });
