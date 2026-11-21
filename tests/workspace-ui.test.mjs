@@ -21,9 +21,9 @@ test('operational workspace renders its six views and reservation editor',async(
     handlers.click({target:el,preventDefault(){}});
   }
   for(const [key,text] of [
-    ['overview','Upcoming arrivals'],['calendar','Room allocation'],
+    ['overview','Needs attention'],['calendar','Room allocation'],
     ['reservations','Booking register'],['distribution','Channel room mapping'],
-    ['operations','Maintenance blocks'],['inventory','Inventory matrix']]){
+    ['operations','Maintenance blocks'],['performance','Daily availability & revenue'],['inventory','Inventory matrix']]){
     click({nav:key});assert.match(root.innerHTML,new RegExp(text),key);
   }
   click({nav:'distribution'});

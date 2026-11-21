@@ -10,9 +10,9 @@ test('forward booked KPIs use reservation room-nights, not total booking value',
   assert.equal(k.days,14);
   assert.equal(k.rooms,7); // One of eight physical rooms is permanently under maintenance.
   assert.equal(k.inventoryRoomNights,98);
-  assert.equal(k.occupiedRoomNights,19);
-  assert.equal(k.availableRoomNights,79);
-  assert.equal(k.occupancy,19.4);
+  assert.equal(k.occupiedRoomNights,28);
+  assert.equal(k.availableRoomNights,70);
+  assert.equal(k.occupancy,28.6);
   assert.ok(k.roomRevenue>0);
   assert.equal(k.adr,Math.round(k.roomRevenue/k.occupiedRoomNights));
   assert.equal(k.revpar,Math.round(k.roomRevenue/k.inventoryRoomNights));

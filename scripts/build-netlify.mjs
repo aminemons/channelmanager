@@ -3,7 +3,7 @@ import {join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=resolve(fileURLToPath(new URL('..',import.meta.url)));
 const dist=join(root,'dist');
-const assets=['index.html','workspace.js','workspace-core.mjs','calendar-exchange.mjs','hotel.mjs','workspace.css','favicon.svg'];
+const assets=['index.html','workspace.js','workspace-core.mjs','calendar-exchange.mjs','decision-engine.mjs','hotel.mjs','workspace.css','favicon.svg'];
 const html=readFileSync(join(root,'index.html'),'utf8');
 if(!html.includes('/workspace.js')||!html.includes('/workspace.css'))throw new Error('Workspace entrypoint missing');
 if(!readFileSync(join(root,'workspace.js'),'utf8').includes("./workspace-core.mjs"))throw new Error('Missing hotel engine import');
