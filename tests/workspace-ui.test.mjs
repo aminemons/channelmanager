@@ -10,8 +10,8 @@ test('operational workspace renders its six views and reservation editor',async(
   globalThis.localStorage={getItem(){return null;},setItem(){}};
   globalThis.window={addEventListener(){}};
   await import('../workspace.js');
-  assert.match(root.innerHTML,/Inventory matrix/);
-  assert.match(root.innerHTML,/Nightly rate/);
+  assert.match(root.innerHTML,/Needs attention/);
+  assert.match(root.innerHTML,/Booked room revenue/);
   function click(data){
     const el={dataset:data, classList:{contains(){return false;}},closest(s){
       if(s==='[data-nav]'&&data.nav)return this;
