@@ -49,7 +49,7 @@ function save(next,message='Saved'){
   catch(e){ui.notice='Browser storage is unavailable. Export a backup before leaving.';}
   render();
 }
-function alertUser(message){ui.notice=message;render();}
+function alertUser(message){const d=document.querySelector?.('.dialog');if(d){let e=d.querySelector('.form-error');if(!e){e=document.createElement('div');e.className='form-error';e.setAttribute('role','alert');d.querySelector('.dialog-head').after(e);}e.textContent=message;return;}ui.notice=message;render();}
 function setView(v){ui.view=v;ui.modal=null;ui.preview=null;ui.notice='';render();}
 function download(name,contents,type='text/plain'){
   const file=new Blob([contents],{type});
@@ -193,7 +193,7 @@ function operations(){
   '<input type="file" id="backup-file" accept=".json,application/json" hidden></div></section>';
 }
 function selectOptions(list,selected){return list.map(item=>'<option value="'+esc(item.value||item)+'" '+((item.value||item)===selected?'selected':'')+'>'+esc(item.label||item)+'</option>').join('');}
-function field(label,name,value='',type='text',extra=''){return '<label class="field"><span>'+label+'</span><input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+extra+' required></label>';}
+function field(label,name,value='',type='text',extra=''){const optional=['email','externalRef','rate','remoteId'].includes(name);return '<label class="field"><span>'+label+'</span><input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+extra+(optional?'':' required')+'></label>';}
 function selectField(label,name,values,chosen){return '<label class="field"><span>'+label+'</span><select name="'+name+'">'+selectOptions(values,chosen)+'</select></label>';}
 function modalShell(title,intro,body){
   return '<div class="modal-backdrop" data-action="close-modal"><section class="dialog" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><div class="dialog-head"><div><h2>'+esc(title)+'</h2><p>'+esc(intro)+'</p></div>'+button(ic('close',20),'close-modal','aria-label="Close"','plain-icon')+'</div>'+body+'</section></div>';
@@ -330,6 +330,15 @@ root.addEventListener('change',async e=>{
     }catch(err){alertUser(err.message||'Could not restore backup.');}
   }
 });
+root.addEventListener('input',e=>{
+  if(e.target.id!=='booking-search')return;
+  const value=e.target.value;
+  const cursor=e.target.selectionStart;
+  ui.search=value;
+  render();
+  const input=document.getElementById('booking-search');
+  if(input){input.focus();try{input.setSelectionRange(cursor,cursor);}catch{}}
+});
 root.addEventListener('submit',e=>{
   const form=e.target.closest('[data-form]');if(!form)return;
   e.preventDefault();
@@ -353,7 +362,7 @@ root.addEventListener('submit',e=>{
     if(form.dataset.form==='block'){
       const result=blockRoom(state,v);ui.modal=null;save(result,'Room blocked.');return;
     }
-  }catch(err){ui.notice=err.message||'Could not save.';render();}
+  }catch(err){alertUser(err.message||'Could not save.');}
 });
 window.addEventListener('keydown',e=>{if(e.key==='Escape'&&ui.modal){ui.modal=null;render();}});
 render();
