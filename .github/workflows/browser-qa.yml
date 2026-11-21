@@ -1,0 +1,41 @@
+name: HOMA browser quality checks
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'workspace.js'
+      - 'workspace.css'
+      - 'workspace-core.mjs'
+      - 'calendar-exchange.mjs'
+      - 'decision-engine.mjs'
+      - 'scripts/serve.mjs'
+      - 'tests/browser-smoke.mjs'
+      - '.github/workflows/browser-qa.yml'
+permissions:
+  contents: read
+jobs:
+  browser-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - run: npm run check && npm test
+      - name: Install pinned browser tools
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts playwright@1.57.0
+          npx playwright install --with-deps chromium
+      - name: Browser smoke and screenshots
+        run: node tests/browser-smoke.mjs
+      - name: Save desktop and mobile screenshots
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: homa-browser-screenshots
+          path: artifacts/browser/
+          if-no-files-found: warn
