@@ -342,3 +342,16 @@ h1,h2,h3,p{margin:0}
  .arrival-link{min-height:71px}
  .outlook-days{min-width:690px}
 }
+
+/* Key financial columns must stay visible at ordinary desktop widths. */
+.reports-layout .register{min-width:0;table-layout:auto}
+.reports-layout .register th,.reports-layout .register td{padding:11px 8px}
+.reports-layout .register th:last-child,.reports-layout .register td:last-child{min-width:105px}
+.reports-layout .cell-gauge{width:42px;margin-right:5px}
+.reports-aside .register th,.reports-aside .register td{padding:12px 9px}
+.reports-aside .register th:last-child,.reports-aside .register td:last-child{min-width:92px}
+@media(max-width:630px){
+ .reports-layout .register{min-width:620px}
+ .reports-aside .register{min-width:0}
+ .reports-aside .register th,.reports-aside .register td{padding:10px 7px;font-size:10px}
+}

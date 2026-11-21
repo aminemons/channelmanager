@@ -45,6 +45,13 @@ try {
  await page.locator('button[data-nav="performance"]').click();
  await page.getByRole('heading',{name:'Performance'}).waitFor();
  await page.getByRole('heading',{name:'Daily availability & revenue'}).waitFor();
+ const perfColumns=await page.locator('.reports-layout > .surface .register thead th').allInnerTexts();
+ assert.ok(perfColumns.some(s=>s.includes('Booked revenue')),'Missing revenue column');
+ const revenueColVisible=await page.locator('.reports-layout > .surface .register thead th').last().evaluate(el=>{
+   const table=el.closest('.table-scroll');
+   return el.getBoundingClientRect().right <= table.getBoundingClientRect().right+2;
+ });
+ assert.ok(revenueColVisible,'Revenue column is hidden behind desktop horizontal scrolling');
  await page.screenshot({path:'artifacts/browser/03-performance-desktop.png',fullPage:true});
  console.log('PASS performance reporting');
 
