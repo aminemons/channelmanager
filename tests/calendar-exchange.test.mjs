@@ -29,8 +29,10 @@ test('imports all-day events into a selected room only after validation',()=>{
  assert.equal(preview.accepted.length,1);
  assert.equal(preview.rejected.length,1);
  assert.equal(state.bookings.length,13);
- assert.equal(preview.staged.bookings.length,14);
- assert.equal(preview.staged.bookings.at(-1).externalRef,'ICAL:external-001');
+ assert.equal(preview.staged.bookings.length,13);
+ assert.equal(preview.staged.blocks.length,1);
+ assert.equal(preview.staged.blocks[0].externalRef,'external-001');
+ assert.equal(preview.staged.blocks[0].source,'iCal');
 });
 test('calendar parser rejects invalid files, datetime events and incorrect room',()=>{
  const s=fresh('2026-11-21');
@@ -46,4 +48,19 @@ test('calendar import skips cancelled external events',()=>{
  const preview=iCalImportPreview(fresh('2026-11-21'),file,'102');
  assert.equal(preview.accepted.length,0);
  assert.equal(preview.rejected.length,0);
+});
+
+test('calendar holds are availability-only and never invent guest revenue',async()=>{
+ const {dashboardNumbers}=await import('../decision-engine.mjs');
+ const s=fresh('2026-11-21');
+ const before=dashboardNumbers(s,'2027-06-10',2);
+ const file=fixture(event('hold-uid','20270610','20270612'));
+ const p=iCalImportPreview(s,file,'102','Airbnb');
+ assert.equal(p.accepted.length,1);
+ const after=dashboardNumbers(p.staged,'2027-06-10',2);
+ assert.equal(after.roomRevenue,before.roomRevenue);
+ assert.equal(after.occupiedRoomNights,before.occupiedRoomNights);
+ assert.equal(after.inventoryRoomNights,before.inventoryRoomNights-2);
+ assert.equal(iCalImportPreview(p.staged,file,'102','Airbnb').accepted.length,0);
+ assert.equal(iCalImportPreview(p.staged,file,'102','Airbnb').rejected.length,1);
 });

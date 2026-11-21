@@ -111,3 +111,16 @@ test('out-of-service status protects future reservations and reduces inventory',
   assert.equal(availableCount(limited,'Deluxe',future),2);
   assert.throws(()=>updateRoom(changed,{roomId:'203',name:'X',rate:10,status:'Ready'}),/2–70/);
 });
+
+test('two overlapping room blocks are rejected instead of silently double-blocking',()=>{
+ let s=blockRoom(data(),{roomId:'102',start:future,end:'2027-06-13',reason:'Repair'});
+ assert.throws(()=>blockRoom(s,{roomId:'102',start:later,end:'2027-06-14',reason:'Another'}),/already blocked/i);
+});
+test('new walk-in reservations respect individual room default rates',()=>{
+ let s=updateRoom(data(),{roomId:'103',name:'Courtyard Queen',rate:18800,status:'Ready'},start);
+ s=reserve(s,candidate('103',future,later));
+ assert.equal(s.bookings.at(-1).rate,18800);
+ s=bulkRule(s,{type:'Classic',from:'2027-06-14',to:'2027-06-14',rate:23000,minStay:1,stopSell:false,cta:false,ctd:false});
+ const withDaily=reserve(s,candidate('102','2027-06-14','2027-06-15'));
+ assert.equal(withDaily.bookings.at(-1).rate,23000);
+});

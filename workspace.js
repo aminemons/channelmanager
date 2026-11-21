@@ -295,7 +295,7 @@ function roomDialog(){
     '<form class="dialog-form" data-form="room"><div class="form-grid">'+
       field('Room name','name',r.name)+field('Base nightly rate (DZD)','rate',r.rate,'number','min="0" max="100000000" step="1"')+
       selectField('Room status','status',['Ready','Maintenance'],r.status)+'</div>'+
-    '<p class="form-help">Changing the base rate updates future proposed prices where no daily override is set. Existing reservation rates stay unchanged. A room with upcoming bookings cannot be taken out of service until they are moved or cancelled.</p>'+
+    '<p class="form-help">New reservations for this room use its base rate unless a daily room-type override applies. Existing reservation rates stay unchanged. A room with upcoming bookings cannot be taken out of service until they are moved or cancelled.</p>'+
     modalActions('Save room')+'</form>');
 }
 function blockDialog(){
@@ -325,7 +325,7 @@ function icalImportDialog(){
     '<div class="dialog-form"><div class="form-grid">'+
     '<label class="field"><span>Room</span><select id="ical-room">'+selectOptions(state.rooms.map(r=>({value:r.id,label:r.id+' — '+r.name})),m.roomId||state.rooms[0].id)+'</select></label>'+
     '<label class="field"><span>Source</span><select id="ical-channel">'+selectOptions(CHANNELS_EXTERNAL,m.channel||'Airbnb')+'</select></label></div>'+
-    '<p class="form-help">Only all-day calendar events are supported; each accepted event becomes a local reservation hold. Existing bookings are never overwritten.</p>'+
+    '<p class="form-help">Only all-day events are supported. Imported events block room availability; they do not create paid guest reservations or add revenue.</p>'+
     '<label class="field file-field"><span>Choose .ics file</span><input type="file" id="ical-file" accept=".ics,text/calendar"></label>'+
     '<label class="field"><span>Or paste calendar content</span><textarea id="ical-text" rows="7" spellcheck="false" placeholder="BEGIN:VCALENDAR">'+esc(m.text||'')+'</textarea></label>'+
     '<div class="dialog-actions">'+button('Cancel','close-modal','','button button-subtle')+button('Check availability','preview-ical','','button button-primary')+'</div>'+rows+'</div>');

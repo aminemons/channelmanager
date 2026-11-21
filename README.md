@@ -11,7 +11,7 @@ A focused hotel operations prototype: the availability matrix comes first, not a
 - **Reservations:** create, edit, cancel, check in/out, search and filter; checkout dates are exclusive and overlaps are prevented.
 - **CSV imports:** paste reservations, inspect accepted/rejected rows and explicitly commit the valid subset. Duplicates and occupancy conflicts are detected.
 - **Channel mapping:** locally map internal room types to external plan IDs for Booking.com, Expedia and Airbnb; configure a rate adjustment and export offline ARI CSV.
-- **iCalendar exchange:** manually import a .ics availability calendar into one room or export its occupied dates without guest names. This is NOT live syncing.
+- **iCalendar exchange:** manually import a .ics availability calendar as date-only inventory blocks, without creating fictional guests or revenue; export occupied dates without guest names. This is NOT live syncing.
 - **Operations:** edit the physical room directory and base rates, move rooms into/out of maintenance with booking safeguards, block room dates for repairs, review a local activity log, and export/restore workspace data.
 
 ## Important limitations

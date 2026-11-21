@@ -114,7 +114,7 @@ export function reserve(state,booking,exceptId=null) {
   if(exceptId&&!target)throw new Error('Reservation no longer exists.');
   const room=next.rooms.find(r=>r.id===booking.roomId);
   const row={...target,...booking,id:exceptId||'RS-'+Math.max(1001,...next.bookings.map(b=>Number(String(b.id).replace(/\D/g,''))||1000)+1), 
-    guest:str(booking.guest), guests:Number(booking.guests), rate:Number(booking.rate??rateFor(next,room.type,booking.checkIn)), createdAt:target?.createdAt||iso(new Date())};
+    guest:str(booking.guest), guests:Number(booking.guests), rate:Number(booking.rate??(getRule(next,room.type,booking.checkIn).rate??room.rate)), createdAt:target?.createdAt||iso(new Date())};
   if(target){Object.assign(target,row);} else next.bookings.push(row);
   logs(next,(exceptId?'Updated reservation ':'Created reservation ')+row.id+' · '+row.guest);
   return next;
@@ -166,8 +166,9 @@ export function blockRoom(state,{roomId,start,end,reason}) {
   if(!state.rooms.some(r=>r.id===roomId))throw new Error('Unknown room.');
   if(!isDate(start)||!isDate(end)||nights(start,end)<1)throw new Error('Invalid block dates.');
   if(state.bookings.some(b=>b.status!=='Cancelled'&&b.roomId===roomId&&intersects(start,end,b.checkIn,b.checkOut)))throw new Error('Move or cancel existing reservations before blocking this room.');
+  if((state.blocks||[]).some(b=>b.roomId===roomId&&intersects(start,end,b.start,b.end)))throw new Error('Room already blocked for these dates.');
   const next=deep(state);
-  next.blocks.push({id:'BL-'+Date.now(),roomId,start,end,reason:str(reason).slice(0,150)||'Maintenance'});
+  next.blocks.push({id:'BL-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),roomId,start,end,reason:str(reason).slice(0,150)||'Maintenance'});
   logs(next,'Blocked room '+roomId+' · '+start+' to '+end);
   return next;
 }

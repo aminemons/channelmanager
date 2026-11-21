@@ -1,5 +1,5 @@
 import {isDate,nights} from './hotel.mjs';
-import {CHANNELS_EXTERNAL,reserve} from './workspace-core.mjs';
+import {CHANNELS_EXTERNAL,blockRoom} from './workspace-core.mjs';
 
 function isoDate(token) {
   const s=String(token||'').trim();
@@ -37,10 +37,13 @@ export function iCalImportPreview(state,text,roomId,channel='Airbnb'){
     if(!uid||!start||!end||nights(start,end)<1||nights(start,end)>90){
       rejected.push({line:i+1,error:'Missing UID or unsupported calendar dates. Only date-based events lasting 1–90 nights are accepted.'});continue;
     }
-    const item={guest:'External calendar hold',roomId,checkIn:start,checkOut:end,channel,
-      externalRef:'ICAL:'+uid,guests:1,email:'',status:'Confirmed'};
     try{
-      staged=reserve(staged,item);
+      if(staged.blocks.some(b=>b.source==='iCal'&&b.channel===channel&&b.externalRef===uid)){
+        throw new Error('Duplicate external calendar event.');
+      }
+      staged=blockRoom(staged,{roomId,start,end,reason:'Imported calendar · '+channel});
+      const last=staged.blocks.at(-1);
+      last.source='iCal';last.channel=channel;last.externalRef=uid;
       accepted.push({line:i+1,uid,start,end});
     }catch(e){rejected.push({line:i+1,error:e.message||'Event conflicts with existing availability.'});}
   }
