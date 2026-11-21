@@ -1,7 +1,6 @@
 name: Publish HOMA to GitHub Pages
+# Run manually after enabling Pages in Repository Settings -> Pages -> GitHub Actions.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -57,8 +56,6 @@ jobs:
           PY
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
