@@ -6,8 +6,8 @@
   "description": "HOMA — local hotel ARI and reservation operations workspace",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check hotel.mjs && node --check app.js && node --check workspace-core.mjs && node --check calendar-exchange.mjs && node --check workspace.js && node --check scripts/build-netlify.mjs",
-    "start": "python3 -m http.server 4173",
+    "check": "node --check hotel.mjs && node --check app.js && node --check workspace-core.mjs && node --check calendar-exchange.mjs && node --check workspace.js && node --check scripts/build-netlify.mjs && node --check scripts/serve.mjs",
+    "start": "node scripts/serve.mjs",
     "build:netlify": "node scripts/build-netlify.mjs"
   },
   "license": "MIT"

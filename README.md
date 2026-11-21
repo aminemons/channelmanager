@@ -1,66 +1,61 @@
-# HOMA — Hotel Operations Workspace
+# HOMA — Hotel Distribution Workspace
 
-A considered, responsive **hotel operations prototype** with a public marketing experience and a functioning, local-first staff workspace. Built from scratch for `aminemons/channelmanager`.
+A focused hotel operations prototype: the availability matrix comes first, not a decorative marketing homepage.
 
-**Live application:** `https://channelmanager-homa.vercel.app` (once deployed)
+**Status:** working single-browser prototype. No OTA account is connected. Do not use this as a source of truth for a working hotel.
 
-## What works now
+## What staff can actually do
 
-- **Overview:** occupancy today, front-desk activity, next-seven-day booking value, upcoming stays.
-- **Reservations:** create, edit, cancel, search, filter, and export CSV. Bookings have guests, room, dates, guest count, source, status, and a fixed nightly booked rate.
-- **Calendar:** 14-day horizontal inventory plan, room occupancy overlays, date navigation, click-to-book open days.
-- **Rooms & rates:** add a room, update rate/type/floor, mark as maintenance with future booking safety checks.
-- **Guests:** derive a guest list from reservation records.
-- **Reports:** occupancy outlook, booked room nights, and breakdown by source.
-- **Workspace settings:** rename property, export/import a JSON backup, restore sample data.
-- **Responsive UI:** desktop, tablet, mobile, and reduced-motion accommodations.
-- **Conflict prevention:** room/date overlap validation, exclusive checkout dates, unavailable maintenance rooms.
+- **Availability & rates:** see sellable Classic, Deluxe and Suite rooms by date. Edit one date or bulk update nightly rate, minimum stay, stop sell, closed to arrival and closed to departure.
+- **Room calendar:** see occupied, vacant and blocked rooms, click vacant days to create bookings, open existing stays.
+- **Reservations:** create, edit, cancel, check in/out, search and filter; checkout dates are exclusive and overlaps are prevented.
+- **CSV imports:** paste reservations, inspect accepted/rejected rows and explicitly commit the valid subset. Duplicates and occupancy conflicts are detected.
+- **Channel mapping:** locally map internal room types to external plan IDs for Booking.com, Expedia and Airbnb; configure a rate adjustment and export offline ARI CSV.
+- **iCalendar exchange:** manually import a .ics availability calendar into one room or export its occupied dates without guest names. This is NOT live syncing.
+- **Operations:** block room dates for maintenance, review a local activity log, export backup JSON, restore a backup and export reservations.
 
-## Scope: demo, not a production Channel Manager
+## Important limitations
 
-This prototype stores records in **the current browser's localStorage**. Data is not shared between devices, there is no user login, no secure backend, no transactional database, and no payment processing. Sample guests are entirely fictional. **Never enter actual hotel or guest data into this demo.**
-
-The Booking.com, Airbnb, and Expedia screens explicitly say **Not connected**. They do not perform OTA synchronization. Actual connectivity requires provider partnership/API approval, rate and inventory mapping, webhook/polling processing, transactional persistence, retries/idempotency, security reviews, and monitoring. Do not market this prototype as having real channel integrations.
-
-### Production roadmap
-
-1. Transactional PostgreSQL database for properties, staff, rooms, rate plans, bookings, inventory blocks, and reconciliation events. Enforce overlapping-stay exclusion transactionally.
-2. Authentication, property tenancy, role-based authorization, audit history, encryption and GDPR / applicable local privacy compliance.
-3. Server booking APIs with idempotency keys, optimistic concurrency, request validation and durable queues.
-4. Approved OTA partner integrations: mapping, credential vault, sandbox certification, webhook deduplication, retries, and daily inventory reconciliation.
-5. End-to-end browser tests, observability, backups, security scans, and controlled production releases.
+This version stores data only in the current browser's localStorage. There is no multi-user access, server database, payment gateway, approved OTA API connection, automated calendar polling or verified production security. Sample hotel and guests are fictional. **Do not enter real guest or hotel data in this prototype.** An actual Channel Manager needs OTA partner approval, mapping, queue/retry mechanisms, transactional inventory control, staff authorization and monitoring.
 
 ## Run locally
 
-No package installation is required. Any static server works:
+Node 22 or later; no third-party packages needed.
 
-```bash
-python3 -m http.server 4173
-# Open http://localhost:4173 then http://localhost:4173/app
-```
+    npm start
 
-## Test
+Visit http://localhost:4173/ or http://localhost:4173/app .
 
-Requires Node.js 20+; no dependencies:
+## Validate
 
-```bash
-npm run check
-npm test
-```
+    npm run check
+    npm test
+    npm run build:netlify
 
-The pure booking engine is in `hotel.mjs`, and its unit tests are in `tests/hotel.test.mjs`.
+The automated suite checks inventory, stay restrictions, reservation lifecycle, CSV/iCalendar imports, offline mapping, dashboard render and release bundling. These tests do not replace a full browser/accessibility/security audit.
 
-## Technology
+## Netlify publishing
 
-Zero-framework vanilla JavaScript modules, semantic HTML, custom responsive CSS, and SVG iconography. Deliberately no CDN component kit, heavy UI framework, or dependency-lock maintenance burden. Fonts have system fallbacks.
+Connect GitHub repository aminemons/channelmanager to Netlify through Add new project > Import existing project. Netlify reads netlify.toml. It executes the tests and publishes the dist directory, with /app rewritten to the main document. If continuous deployment is enabled, new commits to main rebuild automatically.
 
-## Open-source reference evaluation
+    Build command: npm run check && npm test && npm run build:netlify
+    Publish directory: dist
 
-- **QloApps** ([repository](https://github.com/Qloapps/QloApps)): a mature PHP + MySQL hotel PMS and booking engine, but a different hosting stack; check the terms and availability of any channel modules.
-- **Kamra PMS** ([repository](https://github.com/Kamra-PMS/kamra-pms)): feature-rich Frappe-based hotel PMS (AGPL). Heavy self-hosted architecture and licensing considerations; not suitable to silently copy into a small Vercel frontend.
+## Code
 
-HOMA's implementation is new and does not copy their source code. Use these for workflow and feature research rather than assuming OTA integrations are freely reusable.
+- workspace.js: operational interface, screen and forms
+- workspace.css: responsive UI
+- workspace-core.mjs: daily ARI model, bookings, mapping and CSV
+- calendar-exchange.mjs: manual .ics imports/exports
+- hotel.mjs: sample seed and legacy booking primitives
+- scripts/build-netlify.mjs: static release
+- scripts/serve.mjs: dependency-free local server with /app fallback
+- tests/: automated validation
 
-## Privacy & licensing
+Old app.js and styles.css remain for archival tests but are not served by the new Netlify build.
 
-MIT-licensed original prototype. No real guest details and no embedded service credentials. Demo data can be cleared from Settings or browser storage. All customer-facing integration claims must remain truthful.
+## Production roadmap
+
+Transactional database, hotel tenancy and roles, atomic overbooking prevention, certified OTA API adapters, idempotent webhook processing, reconciliation jobs, security/a11y/browser QA, and monitored backups.
+
+This prototype is original code, not a copy of any proprietary Channel Manager.
