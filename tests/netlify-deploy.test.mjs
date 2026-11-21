@@ -15,3 +15,13 @@ test('Netlify bundle contains the operational dashboard and dependency tree',()=
   assert.ok(existsSync(join(dist,'workspace-core.mjs')));
   assert.match(readFileSync(join(dist,'workspace.js'),'utf8'),/Availability & rates/);
 });
+
+test('dev server serves the same imported workspace modules as the Netlify artifact',()=>{
+  const server=readFileSync(join(root,'scripts','serve.mjs'),'utf8');
+  const source=readFileSync(join(root,'workspace.js'),'utf8');
+  for(const file of ['workspace-core.mjs','calendar-exchange.mjs','decision-engine.mjs','hotel.mjs']){
+    assert.ok(server.includes('/'+file),'Server missing '+file);
+    assert.ok(existsSync(join(root,'dist',file)),'Netlify bundle missing '+file);
+    if(file!=='hotel.mjs')assert.ok(source.includes('./'+file),'Workspace missing import '+file);
+  }
+});

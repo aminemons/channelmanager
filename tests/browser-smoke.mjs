@@ -24,6 +24,7 @@ try {
  const errors=[];
  page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/app',{waitUntil:'networkidle'});
+ if(await page.locator('h1').count()===0){console.error('BROWSER PAGE ERRORS:',errors);console.error('BODY:',(await page.locator('body').innerHTML()).slice(0,1600));throw new Error('Dashboard did not render.');}
  assert.equal(await page.locator('h1').innerText(),'Control desk');
  assert.ok(await page.locator('.queue-row').count()>0);
  assert.equal(await page.locator('.desk-headline small').innerText(),'Demo data · Browser only · No connected channels');

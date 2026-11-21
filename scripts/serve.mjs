@@ -6,7 +6,7 @@ const root=dirname(dirname(fileURLToPath(import.meta.url)));
 const files={
  '/':'index.html','/app':'index.html','/app/':'index.html',
  '/workspace.js':'workspace.js','/workspace-core.mjs':'workspace-core.mjs',
- '/calendar-exchange.mjs':'calendar-exchange.mjs','/hotel.mjs':'hotel.mjs',
+ '/calendar-exchange.mjs':'calendar-exchange.mjs','/decision-engine.mjs':'decision-engine.mjs','/hotel.mjs':'hotel.mjs',
  '/workspace.css':'workspace.css','/favicon.svg':'favicon.svg'
 };
 const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8',
