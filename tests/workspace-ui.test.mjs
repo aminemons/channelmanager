@@ -26,7 +26,10 @@ test('operational workspace renders seven views, booking editor and room managem
     ['operations','Physical room directory'],['performance','Daily availability & revenue'],['inventory','Inventory matrix']]){
     click({nav:key});assert.match(root.innerHTML,new RegExp(text),key);
   }
+  click({action:'toggle-menu'});
+  assert.match(root.innerHTML,/nav-list is-open/);
   click({nav:'distribution'});
+  assert.doesNotMatch(root.innerHTML,/nav-list is-open/);
   assert.match(root.innerHTML,/Manual calendar exchange/);
   click({action:'import-ical'});
   assert.match(root.innerHTML,/Import iCalendar/);

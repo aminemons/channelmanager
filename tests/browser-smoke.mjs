@@ -84,6 +84,12 @@ try {
  await page.setViewportSize({width:390,height:844});
  const docWidth=await page.evaluate(()=>document.documentElement.scrollWidth);
  assert.ok(docWidth<=390,'Whole page should not scroll horizontally on mobile; width='+docWidth);
+ await page.locator('.mobile-menu-toggle').click();
+ await page.locator('button[data-nav="distribution"]').click();
+ await page.getByRole('heading',{name:'Channel distribution'}).waitFor();
+ await page.locator('.mobile-menu-toggle').click();
+ await page.locator('button[data-nav="overview"]').click();
+ await page.getByRole('heading',{name:'Control desk'}).waitFor();
  await page.screenshot({path:'artifacts/browser/04-control-desk-mobile.png',fullPage:true});
  assert.equal(await page.getByRole('heading',{name:'Control desk'}).count(),1);
  console.log('PASS mobile layout without page-wide horizontal overflow');

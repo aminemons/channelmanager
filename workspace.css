@@ -320,3 +320,25 @@ h1,h2,h3,p{margin:0}
 .room-offline{font-size:11px;color:#a75a47;font-weight:600}
 .room-online{font-size:11px;color:#467b67;font-weight:600}
 @media(max-width:700px){.operations-split{grid-template-columns:1fr}}
+
+/* Mobile uses an explicit navigation menu, not undiscoverable horizontal tabs. */
+.mobile-brand-row{display:block}
+.mobile-menu-toggle{display:none}
+@media(max-width:760px){
+ .mobile-brand-row{display:flex;align-items:center;justify-content:space-between;min-height:49px}
+ .mobile-brand-row .brand{padding:7px 6px 11px}
+ .mobile-menu-toggle{display:inline-flex;align-items:center;gap:8px;color:#e6f3fd;background:#173b64;border:1px solid #355d83;border-radius:7px;padding:0 13px;height:37px;font-size:12px;font-weight:600;margin-bottom:4px}
+ .mobile-menu-toggle:hover{background:#24517c}
+ .nav-list{display:none;flex-direction:column;overflow:visible;gap:2px;padding:6px 0 9px;border-top:1px solid #294a70}
+ .nav-list.is-open{display:flex}
+ .nav-link{min-height:43px;width:100%;font-size:12.5px;border-radius:6px}
+ .nav-link svg{width:17px;height:17px}
+ .view-title p{font-size:13px}
+ .surface h2{font-size:16px}
+ .metric span{font-size:12px}
+ .queue-copy strong,.arrival-guest strong{font-size:13px}
+ .queue-copy small,.arrival-guest small{font-size:11px}
+ .queue-list .queue-row{min-height:74px}
+ .arrival-link{min-height:71px}
+ .outlook-days{min-width:690px}
+}
