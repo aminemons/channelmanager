@@ -243,3 +243,13 @@ h1,h2,h3,p{margin:0}
 }
 @media(max-width:420px){.metrics{grid-template-columns:1fr 1fr}.metric>span{font-size:11px}.metric small{font-size:9px}.topbar-path{gap:6px}.topbar-right .button{font-size:10px}.inline-prompt>.button{width:100%}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Calendar exchange — operational tools, never decorative cards. */
+.calendar-exchange{margin-top:22px;padding:24px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.calendar-exchange h2{font-size:15px;font-weight:600}
+.calendar-exchange p{margin-top:7px;max-width:510px;line-height:1.65}
+.exchange-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.file-field{margin-top:20px;margin-bottom:20px}
+.field input[type="file"]{height:auto;padding:10px;cursor:pointer}
+.form-error{padding:12px 25px;background:#fff1ed;border-bottom:1px solid #f3d9ce;color:#9d402e;font-size:12px}
+@media(max-width:850px){.calendar-exchange{align-items:flex-start;flex-direction:column;padding:19px}}
