@@ -1,7 +1,7 @@
 import {iso,addDays,nights} from './hotel.mjs';
 import {iCalImportPreview,writeICal} from './calendar-exchange.mjs';
 import {dashboardNumbers,mappingAudit,rateComparison,workQueue,scheduledArrivals} from './decision-engine.mjs';
-import {TYPES,CHANNELS_EXTERNAL,fresh,hydrate,availableCount,allTypeRooms,getRule,rateFor,quoteStay,reserve,changeStatus,bulkRule,blockRoom,unblock,channelMap,feedRows,toCSV,importPreview,sampleCSV,availableCandidateIds} from './workspace-core.mjs';
+import {TYPES,CHANNELS_EXTERNAL,fresh,hydrate,availableCount,allTypeRooms,getRule,rateFor,quoteStay,reserve,changeStatus,bulkRule,blockRoom,unblock,updateRoom,channelMap,feedRows,toCSV,importPreview,sampleCSV,availableCandidateIds} from './workspace-core.mjs';
 
 const STORE='homa.workspace.v2';
 const OLD='homa.hospitality.demo.v1';
@@ -68,7 +68,7 @@ const primary=(text,action,extra='')=>button(ic('add',16)+esc(text),action,extra
 function shell(){
   return '<div class="shell">'+
   '<aside class="sidebar"><a href="/app" class="brand" data-nav="inventory"><span class="brand-mark">H</span><span>homa<span class="brand-period">.</span></span></a>'+
-  '<div class="property-switch"><div class="property-initial">MO</div><div class="property-name"><strong>'+esc(state.hotelName)+'</strong><small>'+esc(state.location)+'</small></div>'+ic('down',15)+'</div>'+
+  '<div class="property-switch"><div class="property-initial">MO</div><div class="property-name"><strong>'+esc(state.hotelName)+'</strong><small>'+esc(state.location)+'</small></div></div>'+
   '<span class="side-heading">WORKSPACE</span><nav class="nav-list">'+navs.map(n=>'<button type="button" class="nav-link '+(ui.view===n[0]?'active':'')+'" data-nav="'+n[0]+'">'+ic(n[1],17)+'<span>'+esc(n[2])+'</span></button>').join('')+'</nav>'+
   '<div class="side-bottom"><div class="local-status"><span class="tiny-square"></span>Local workspace</div><p>Data is stored in this browser. OTA accounts are not connected.</p></div></aside>'+
   '<div class="main"><div class="topbar"><div class="topbar-path">'+ic('hotel',17)+'<span>'+esc(state.hotelName)+'</span><span class="path-separator">/</span><strong>'+esc(navs.find(n=>n[0]===ui.view)?.[2]||'Workspace')+'</strong></div><div class="topbar-right"><span class="today-text">'+fmt(now)+' '+now.slice(0,4)+'</span>'+button(ic('add',16)+' New reservation','new-booking','','button button-primary button-small')+'</div></div>'+
@@ -98,7 +98,7 @@ function overview(){
   const queue=tasks.map(t=>'<button type="button" class="queue-row" data-action="task-go" data-target="'+esc(t.action)+'" data-channel="'+esc(t.channel||'')+'">'+
     '<span class="queue-level '+esc(t.level)+'" aria-hidden="true"></span><span class="queue-copy"><strong>'+esc(t.title)+'</strong><small>'+esc(t.body)+'</small></span><span class="queue-arrow">'+ic('arrow',15)+'</span></button>').join('');
   const guests=arrivals.map(b=>'<button type="button" class="arrival-link" data-action="edit-booking" data-id="'+esc(b.id)+'"><span class="arrival-date"><strong>'+fmt(b.checkIn)+'</strong><small>'+weekday(b.checkIn)+'</small></span><span class="arrival-guest"><strong>'+esc(b.guest)+'</strong><small>'+esc(b.channel)+' · Room '+esc(b.roomId)+' · '+nights(b.checkIn,b.checkOut)+' nights</small></span>'+ic('arrow',15)+'</button>').join('');
-  return head('Control desk','Today’s bookings, distribution setup and inventory decisions.',primary('New reservation','new-booking')+
+  return head('Control desk','Today’s bookings, distribution setup and inventory decisions.',
     button('Edit rates '+ic('arrow',15),'go-inventory','','button button-subtle'))+
   '<div class="desk-headline"><span>'+weekday(now)+', '+fmt(now)+' · '+now.slice(0,4)+'</span><strong>'+esc(state.hotelName)+'</strong><small>Demo data · Browser only · No connected channels</small></div>'+
   '<div class="metrics">'+
@@ -224,15 +224,22 @@ function performance(){
 function operations(){
   const blocks=[...state.blocks].sort((a,b)=>a.start.localeCompare(b.start));
   const rows=blocks.map(b=>'<tr><td>Room '+esc(b.roomId)+'</td><td>'+fmt(b.start)+'</td><td>'+fmt(b.end)+'</td><td>'+esc(b.reason)+'</td><td class="right">'+button('Remove','unblock','data-id="'+esc(b.id)+'"','text-action')+'</td></tr>').join('');
+  const roomRows=state.rooms.map(r=>'<tr><td><strong>'+esc(r.id)+'</strong><small>'+esc(r.floor||'')+'</small></td><td>'+esc(r.name)+'</td><td>'+esc(r.type)+'</td>'+
+    '<td>'+money(r.rate)+'</td><td><span class="'+(r.status==='Maintenance'?'room-offline':'room-online')+'">'+esc(r.status)+'</span></td>'+
+    '<td class="right">'+button('Edit room','edit-room','data-id="'+esc(r.id)+'"','text-action')+'</td></tr>').join('');
   const activity=state.activity.slice(0,20).map(a=>'<div class="activity-item"><div class="activity-mark"></div><div><strong>'+esc(a.message)+'</strong><small>'+new Date(a.at).toLocaleString('en-GB')+'</small></div></div>').join('');
-  return head('Operations','Maintain room availability and keep a record of changes.',primary('Block room','new-block'))+
-  '<div class="split"><section class="surface"><div class="surface-header"><div><h2>Maintenance blocks</h2><p>Blocked dates are deducted from room availability.</p></div></div><div class="table-scroll"><table class="register"><thead><tr><th>Room</th><th>From</th><th>Until</th><th>Reason</th><th></th></tr></thead><tbody>'+(rows||'<tr><td class="empty" colspan="5">No temporary blocks. One room is in permanent maintenance.</td></tr>')+'</tbody></table></div></section>'+
-  '<section class="surface"><div class="surface-header"><div><h2>Activity history</h2><p>Changes performed in this browser</p></div></div><div class="activity-list">'+(activity||'<p class="empty">No changes yet. Editing rates or bookings will create an activity entry.</p>')+'</div></section></div>'+
-  '<section class="surface data-tools"><div><h2>Your data</h2><p>Save or restore local workspace data, or export reservations for spreadsheet review.</p></div><div class="tool-buttons">'+
-  button(ic('export',16)+' Back up workspace','export-backup','','button button-subtle')+
-  button(ic('export',16)+' Reservations CSV','export-reservations','','button button-subtle')+
-  button('Restore JSON backup','restore-backup','','button button-subtle')+
-  '<input type="file" id="backup-file" accept=".json,application/json" hidden></div></section>';
+  return head('Operations','Manage physical rooms, maintenance and local change history.',primary('Block a room','new-block'))+
+  '<section class="surface"><div class="surface-header"><div><h2>Physical room directory</h2><p>Edit room names, base rates and maintenance availability.</p></div></div>'+
+    '<div class="table-scroll"><table class="register"><thead><tr><th>Room</th><th>Name</th><th>Room category</th><th>Base rate</th><th>State</th><th class="right">Action</th></tr></thead><tbody>'+roomRows+'</tbody></table></div></section>'+
+  '<div class="split operations-split"><section class="surface"><div class="surface-header"><div><h2>Temporary room holds</h2><p>Maintenance dates reduce the inventory available for sale.</p></div></div><div class="table-scroll"><table class="register"><thead><tr><th>Room</th><th>From</th><th>Until</th><th>Reason</th><th></th></tr></thead><tbody>'+
+    (rows||'<tr><td class="empty" colspan="5">No scheduled room blocks.</td></tr>')+'</tbody></table></div></section>'+
+  '<section class="surface"><div class="surface-header"><div><h2>Change history</h2><p>Recorded actions in this browser, not a server audit log.</p></div></div><div class="activity-list">'+
+    (activity||'<p class="empty">No recorded changes yet.</p>')+'</div></section></div>'+
+  '<section class="surface data-tools"><div><h2>Workspace data</h2><p>Export a local backup, restore one, or download the reservation register.</p></div><div class="tool-buttons">'+
+    button(ic('export',16)+' Back up','export-backup','','button button-subtle')+
+    button(ic('export',16)+' Reservations CSV','export-reservations','','button button-subtle')+
+    button('Restore backup','restore-backup','','button button-subtle')+
+    '<input type="file" id="backup-file" accept=".json,application/json" hidden></div></section>';
 }
 function selectOptions(list,selected){return list.map(item=>'<option value="'+esc(item.value||item)+'" '+((item.value||item)===selected?'selected':'')+'>'+esc(item.label||item)+'</option>').join('');}
 function field(label,name,value='',type='text',extra=''){const optional=['email','externalRef','rate','remoteId'].includes(name);return '<label class="field"><span>'+label+'</span><input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+extra+(optional?'':' required')+'></label>';}
@@ -281,6 +288,16 @@ function mappingDialog(){
   '<p class="form-help">Saving a mapping does not connect an account. Use the identifier provided by your channel and verify it before any future API integration.</p>'+
   modalActions('Save mapping')+'</form>');
 }
+function roomDialog(){
+  const r=state.rooms.find(x=>x.id===ui.modal.id);
+  if(!r)return '';
+  return modalShell('Edit room '+r.id,'Changes to base pricing or maintenance affect future sellable inventory.',
+    '<form class="dialog-form" data-form="room"><div class="form-grid">'+
+      field('Room name','name',r.name)+field('Base nightly rate (DZD)','rate',r.rate,'number','min="0" max="100000000" step="1"')+
+      selectField('Room status','status',['Ready','Maintenance'],r.status)+'</div>'+
+    '<p class="form-help">Changing the base rate updates future proposed prices where no daily override is set. Existing reservation rates stay unchanged. A room with upcoming bookings cannot be taken out of service until they are moved or cancelled.</p>'+
+    modalActions('Save room')+'</form>');
+}
 function blockDialog(){
   return modalShell('Block a room','Use temporary blocks for maintenance and rooms taken out of service.',
   '<form class="dialog-form" data-form="block"><div class="form-grid">'+
@@ -327,6 +344,7 @@ function renderModal(){
     case 'rule':return ruleDialog();
     case 'mapping':return mappingDialog();
     case 'block':return blockDialog();
+    case 'room':return roomDialog();
     case 'csv':return importDialog();
     case 'icalImport':return icalImportDialog();
     case 'icalExport':return icalExportDialog();
@@ -357,6 +375,7 @@ function action(name,el) {
       case 'bulk-rule':ui.modal={kind:'rule',type:'Classic',from:ui.start,to:addDays(ui.start,ui.days-1)};render();break;
       case 'map-channel':ui.modal={kind:'mapping',type:el.dataset.type};render();break;
       case 'new-block':ui.modal={kind:'block'};render();break;
+      case 'edit-room':ui.modal={kind:'room',id};render();break;
       case 'unblock':if(confirm('Remove this maintenance block?'))save(unblock(state,id),'Maintenance block removed.');break;
       case 'check-in':save(changeStatus(state,id,'Checked in'),'Guest checked in.');break;
       case 'check-out':save(changeStatus(state,id,'Checked out'),'Guest checked out.');break;
@@ -452,6 +471,9 @@ root.addEventListener('submit',e=>{
     if(form.dataset.form==='mapping'){
       const result=channelMap(state,ui.channel,ui.modal.type,v.remoteId,v.adjustment);
       ui.modal=null;save(result,'Mapping saved locally.');return;
+    }
+    if(form.dataset.form==='room'){
+      const result=updateRoom(state,{...v,roomId:ui.modal.id});ui.modal=null;save(result,'Room settings saved.');return;
     }
     if(form.dataset.form==='block'){
       const result=blockRoom(state,v);ui.modal=null;save(result,'Room blocked.');return;
