@@ -106,10 +106,13 @@ export function workQueue(state,day,maxDays=14){
   if(departing.length)tasks.push({id:'departures',level:'attention',title:departing.length+' departure'+(departing.length===1?'':'s')+' due',
     body:'Check out guests after completing their stay.',action:'reservations',count:departing.length});
   const map=mappingAudit(state);
-  for(const row of map.byChannel){
-    if(row.missing.length)tasks.push({id:'map-'+row.channel,level:'setup',title:row.channel+': '+row.missing.length+' unmapped room type'+(row.missing.length===1?'':'s'),
-      body:row.missing.join(', ')+'. Configure mapping IDs before an eventual connection.',
-      action:'distribution',channel:row.channel,count:row.missing.length});
+  const missing=map.total-map.mapped;
+  if(missing){
+    const channels=map.byChannel.filter(row=>row.missing.length).map(row=>row.channel+' ('+row.missing.length+')');
+    tasks.push({id:'mapping',level:'setup',
+      title:missing+' room/rate mappings still need setup',
+      body:channels.join(' · ')+'. Review mapping before a future OTA integration.',
+      action:'distribution',count:missing});
   }
   // Selling out can be a revenue-management decision, but never imply an OTA sync error.
   const sellouts=[];
