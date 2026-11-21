@@ -158,21 +158,19 @@ function calendar(){
     '<div class="calendar-legend"><span><i class="legend-occupied"></i> Reservation</span><span><i class="legend-block"></i> Maintenance block</span><span><i class="legend-free"></i> Available</span></div></section>';
 }
 function reservations(){
-  const query=ui.search.toLowerCase();
-  const list=[...state.bookings].filter(b=>(ui.filter==='All'||ui.filter===b.status)&&
-      (!query||[b.guest,b.id,b.email,b.channel,b.roomId,b.externalRef].some(x=>String(x||'').toLowerCase().includes(query))))
+  const list=[...state.bookings].filter(b=>ui.filter==='All'||ui.filter===b.status)
     .sort((a,b)=>a.checkIn.localeCompare(b.checkIn));
   const options=['All','Confirmed','Checked in','Checked out','Cancelled'].map(v=>'<option '+(v===ui.filter?'selected':'')+'>'+v+'</option>').join('');
   const rows=list.map(b=>{
     const roomName=room(b.roomId)?.name||'';
     const next=b.status==='Confirmed'?button('Check in','check-in','data-id="'+esc(b.id)+'"','text-action'):b.status==='Checked in'?button('Check out','check-out','data-id="'+esc(b.id)+'"','text-action'):'';
-    return '<tr><td><div class="cell-main">'+esc(b.guest)+'</div><small>'+esc(b.id)+(b.externalRef?' · '+esc(b.externalRef):'')+'</small></td><td>'+esc(b.roomId)+'<small>'+esc(roomName)+'</small></td>'+
+    return '<tr data-reservation-row="true" data-search="'+esc([b.guest,b.id,b.email,b.channel,b.roomId,b.externalRef].join(' ').toLowerCase())+'"><td><div class="cell-main">'+esc(b.guest)+'</div><small>'+esc(b.id)+(b.externalRef?' · '+esc(b.externalRef):'')+'</small></td><td>'+esc(b.roomId)+'<small>'+esc(roomName)+'</small></td>'+
     '<td>'+fmt(b.checkIn)+'<small>'+nights(b.checkIn,b.checkOut)+' nights</small></td><td>'+fmt(b.checkOut)+'</td><td>'+esc(b.channel)+'</td><td><span class="status-text">'+esc(b.status)+'</span></td>'+
     '<td class="right">'+next+button('Edit','edit-booking','data-id="'+esc(b.id)+'"','text-action')+'</td></tr>';
   }).join('');
   return head('Reservations','Search, create, modify and complete guest stays.',primary('New reservation','new-booking')+button(ic('export',16)+' Import CSV','import-csv','','button button-subtle'))+
   '<section class="surface"><div class="table-toolbar"><div><h2>Booking register <span class="muted-count">'+list.length+'</span></h2></div><div class="table-controls"><label class="search-field">'+ic('search',16)+'<input id="booking-search" type="search" placeholder="Search guest, reference or room" value="'+esc(ui.search)+'" /></label><label class="sr-only" for="status-filter">Filter status</label><select id="status-filter">'+options+'</select></div></div>'+
-  '<div class="table-scroll"><table class="register"><thead><tr><th>Guest / reference</th><th>Room</th><th>Arrival</th><th>Departure</th><th>Source</th><th>Status</th><th class="right">Actions</th></tr></thead><tbody>'+ (rows||'<tr><td colspan="7" class="empty">No reservations match these filters.</td></tr>')+'</tbody></table></div></section>';
+  '<div class="table-scroll"><table class="register"><thead><tr><th>Guest / reference</th><th>Room</th><th>Arrival</th><th>Departure</th><th>Source</th><th>Status</th><th class="right">Actions</th></tr></thead><tbody>'+ (rows||'<tr><td colspan="7" class="empty">No reservations match these filters.</td></tr>')+'<tr data-search-empty="true" hidden><td colspan="7" class="empty">No reservations match your search.</td></tr></tbody></table></div></section>';
 }
 function distribution(){
   const audit=mappingAudit(state),comparison=rateComparison(state,ui.start);
@@ -351,10 +349,27 @@ function renderModal(){
     default:return '';
   }
 }
+
+function filterReservationRows(){
+  if(ui.view!=='reservations'||typeof root.querySelectorAll!=='function')return;
+  const q=ui.search.trim().toLowerCase();
+  const rows=root.querySelectorAll('tr[data-reservation-row]');
+  let shown=0;
+  for(const row of rows){
+    const match=!q||row.dataset.search.includes(q);
+    row.hidden=!match;
+    if(match)shown++;
+  }
+  const counter=root.querySelector('.muted-count');
+  if(counter)counter.textContent=String(shown);
+  const empty=root.querySelector('[data-search-empty]');
+  if(empty)empty.hidden=shown>0;
+}
 function render(){
   document.title='HOMA — '+(navs.find(n=>n[0]===ui.view)?.[2]||'Hotel operations');
   root.innerHTML=shell();
   document.body.classList.toggle('dialog-open',Boolean(ui.modal));
+  filterReservationRows();
 }
 function action(name,el) {
   const id=el.dataset.id;
@@ -429,7 +444,7 @@ root.addEventListener('click',e=>{
 root.addEventListener('change',async e=>{
   if(e.target.id==='status-filter'){ui.filter=e.target.value;render();}
   if(e.target.id==='channel-select'){ui.channel=e.target.value;render();}
-  if(e.target.id==='booking-search'){ui.search=e.target.value;render();}
+
   if(e.target.id==='ical-file'){
     try{const f=e.target.files?.[0];if(!f)return;
       if(f.size>2000000)throw Error('Calendar file exceeds 2 MB.');
@@ -445,12 +460,8 @@ root.addEventListener('change',async e=>{
 });
 root.addEventListener('input',e=>{
   if(e.target.id!=='booking-search')return;
-  const value=e.target.value;
-  const cursor=e.target.selectionStart;
-  ui.search=value;
-  render();
-  const input=document.getElementById('booking-search');
-  if(input){input.focus();try{input.setSelectionRange(cursor,cursor);}catch{}}
+  ui.search=e.target.value;
+  filterReservationRows();
 });
 root.addEventListener('submit',e=>{
   const form=e.target.closest('[data-form]');if(!form)return;
