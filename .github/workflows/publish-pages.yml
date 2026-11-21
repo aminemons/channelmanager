@@ -1,0 +1,66 @@
+name: Publish HOMA to GitHub Pages
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: homa-github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: Test booking logic and every view
+        run: |
+          npm test
+          npm run check
+      - name: Build Pages-safe static copy
+        run: |
+          mkdir -p _site
+          cp index.html styles.css app.js hotel.mjs favicon.svg _site/
+          touch _site/.nojekyll
+          python3 - <<'PY'
+          from pathlib import Path
+          root = Path('_site')
+          index = (root / 'index.html').read_text()
+          for asset in ('styles.css','favicon.svg'):
+              index=index.replace('href="/'+asset+'"','href="./'+asset+'"')
+          index=index.replace('src="/app.js"','src="./app.js"')
+          (root / 'index.html').write_text(index)
+          app=(root/'app.js').read_text()
+          app=app.replace("location.pathname==='/app'","location.hash==='#app'")
+          app=app.replace("p==='app'?'/app':'/'","p==='app'?'#app':'#'")
+          app=app.replace('href="/app"','href="#app"').replace('href="/"','href="#"')
+          (root/'app.js').write_text(app)
+          assert 'location.pathname' not in app
+          assert 'href="./styles.css"' in index
+          PY
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4
