@@ -1,4 +1,5 @@
 import {iso,addDays,nights} from './hotel.mjs';
+import {iCalImportPreview,writeICal} from './calendar-exchange.mjs';
 import {TYPES,CHANNELS_EXTERNAL,fresh,hydrate,availableCount,allTypeRooms,getRule,rateFor,quoteStay,reserve,changeStatus,bulkRule,blockRoom,unblock,channelMap,feedRows,toCSV,importPreview,sampleCSV,availableCandidateIds} from './workspace-core.mjs';
 
 const STORE='homa.workspace.v2';
@@ -177,7 +178,10 @@ function distribution(){
   '<section class="surface"><div class="table-toolbar"><div><h2>Channel room mapping</h2><p>Assign each internal room type to its corresponding channel rate-plan identifier.</p></div><select id="channel-select" aria-label="Select channel">'+CHANNELS_EXTERNAL.map(c=>'<option '+(c===ui.channel?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>'+
   '<div class="table-scroll"><table class="register"><thead><tr><th>Internal room type</th><th>External plan ID</th><th>Rate adjustment</th><th>Channel rate today</th><th class="right">Manage</th></tr></thead><tbody>'+rows+'</tbody></table></div></section>'+
   '<section class="surface feed-surface"><div class="surface-header"><div><h2>Availability, rates & restrictions</h2><p>Read-only preview of the data this property can prepare for a future integration.</p></div>'+dateBar()+'</div>'+
-  '<div class="table-scroll"><table class="register compact"><thead><tr><th>Room type</th><th>Date</th><th>Available</th><th>Rate</th><th>Min stay</th><th>Stop sell</th></tr></thead><tbody>'+prev+'</tbody></table></div></section>';
+  '<div class="table-scroll"><table class="register compact"><thead><tr><th>Room type</th><th>Date</th><th>Available</th><th>Rate</th><th>Min stay</th><th>Stop sell</th></tr></thead><tbody>'+prev+'</tbody></table></div></section>'+
+  '<section class="surface calendar-exchange"><div><h2>Calendar exchange</h2><p>Import and export room availability as standard .ics files. Manual exchange only — no live calendar subscription.</p></div><div class="exchange-actions">'+
+  button('Import calendar (.ics)','import-ical','','button button-subtle')+
+  button(ic('export',16)+' Export room calendar','export-ical','','button button-subtle')+'</div></section>';
 }
 function operations(){
   const blocks=[...state.blocks].sort((a,b)=>a.start.localeCompare(b.start));
@@ -257,6 +261,27 @@ function importDialog(){
     '<label class="field"><span>CSV content</span><textarea id="csv-import" rows="9" spellcheck="false" placeholder="'+esc(sample)+'">'+esc(ui.modal.csv||'')+'</textarea></label>'+
     '<div class="dialog-actions">'+button('Cancel','close-modal','','button button-subtle')+button('Validate rows','preview-import','','button button-primary')+'</div>'+summary+'</div>');
 }
+function icalImportDialog(){
+  const m=ui.modal,p=ui.preview;
+  const rows=p?'<div class="import-summary"><strong>'+p.accepted.length+' accepted</strong><span>'+p.rejected.length+' rejected</span></div>'+
+    (p.rejected.length?'<div class="validation-errors">'+p.rejected.map(v=>'<div>Event '+v.line+': '+esc(v.error)+'</div>').join('')+'</div>':'')+
+    (p.accepted.length?button('Commit '+p.accepted.length+' calendar entries','commit-ical','','button button-primary'):''):'';
+  return modalShell('Import iCalendar','Import room holds from an existing calendar export. Dates are checked before saving.',
+    '<div class="dialog-form"><div class="form-grid">'+
+    '<label class="field"><span>Room</span><select id="ical-room">'+selectOptions(state.rooms.map(r=>({value:r.id,label:r.id+' — '+r.name})),m.roomId||state.rooms[0].id)+'</select></label>'+
+    '<label class="field"><span>Source</span><select id="ical-channel">'+selectOptions(CHANNELS_EXTERNAL,m.channel||'Airbnb')+'</select></label></div>'+
+    '<p class="form-help">Only all-day calendar events are supported; each accepted event becomes a local reservation hold. Existing bookings are never overwritten.</p>'+
+    '<label class="field file-field"><span>Choose .ics file</span><input type="file" id="ical-file" accept=".ics,text/calendar"></label>'+
+    '<label class="field"><span>Or paste calendar content</span><textarea id="ical-text" rows="7" spellcheck="false" placeholder="BEGIN:VCALENDAR">'+esc(m.text||'')+'</textarea></label>'+
+    '<div class="dialog-actions">'+button('Cancel','close-modal','','button button-subtle')+button('Check availability','preview-ical','','button button-primary')+'</div>'+rows+'</div>');
+}
+function icalExportDialog(){
+  return modalShell('Export room calendar','Download a file containing occupied dates only; guest identities are excluded.',
+    '<div class="dialog-form"><label class="field"><span>Room</span><select id="ical-export-room">'+selectOptions(state.rooms.map(r=>({value:r.id,label:r.id+' — '+r.name})),state.rooms[0].id)+'</select></label>'+
+    '<p class="form-help">Exporting an .ics file does not automatically update any booking website. Upload it manually where calendar imports are supported.</p>'+
+    '<div class="dialog-actions">'+button('Cancel','close-modal','','button button-subtle')+
+    button(ic('export',16)+' Download .ics','download-ical','','button button-primary')+'</div></div>');
+}
 function renderModal(){
   if(!ui.modal)return '';
   switch(ui.modal.kind){
@@ -265,6 +290,8 @@ function renderModal(){
     case 'mapping':return mappingDialog();
     case 'block':return blockDialog();
     case 'csv':return importDialog();
+    case 'icalImport':return icalImportDialog();
+    case 'icalExport':return icalExportDialog();
     default:return '';
   }
 }
@@ -295,6 +322,25 @@ function action(name,el) {
       case 'check-out':save(changeStatus(state,id,'Checked out'),'Guest checked out.');break;
       case 'cancel-booking':if(confirm('Cancel reservation '+id+'?')){save(changeStatus(state,id,'Cancelled'),'Reservation cancelled.');ui.modal=null;render();}break;
       case 'import-csv':ui.modal={kind:'csv',csv:''};ui.preview=null;render();break;
+      case 'import-ical':ui.modal={kind:'icalImport',text:'',channel:'Airbnb',roomId:state.rooms[0].id};ui.preview=null;render();break;
+      case 'export-ical':ui.modal={kind:'icalExport'};render();break;
+      case 'preview-ical':{
+        const text=document.getElementById('ical-text').value;
+        const channel=document.getElementById('ical-channel').value;
+        const roomId=document.getElementById('ical-room').value;
+        ui.modal.text=text;ui.modal.channel=channel;ui.modal.roomId=roomId;
+        ui.preview=iCalImportPreview(state,text,roomId,channel);render();break;
+      }
+      case 'commit-ical':{
+        if(!ui.preview||!ui.preview.accepted.length)throw Error('No valid calendar entries to import.');
+        const next=ui.preview.staged,c=ui.preview.accepted.length;
+        ui.modal=null;ui.preview=null;save(next,c+' calendar entries imported.');break;
+      }
+      case 'download-ical':{
+        const roomId=document.getElementById('ical-export-room').value;
+        download('homa-room-'+roomId+'.ics',writeICal(state,roomId),'text/calendar;charset=utf-8');
+        ui.modal=null;alertUser('Calendar file exported for room '+roomId+'.');break;
+      }
       case 'preview-import':{
         const csv=document.getElementById('csv-import').value;ui.modal.csv=csv;
         ui.preview=importPreview(state,csv);render();break;
@@ -324,6 +370,13 @@ root.addEventListener('change',async e=>{
   if(e.target.id==='status-filter'){ui.filter=e.target.value;render();}
   if(e.target.id==='channel-select'){ui.channel=e.target.value;render();}
   if(e.target.id==='booking-search'){ui.search=e.target.value;render();}
+  if(e.target.id==='ical-file'){
+    try{const f=e.target.files?.[0];if(!f)return;
+      if(f.size>2000000)throw Error('Calendar file exceeds 2 MB.');
+      const text=await f.text();if(ui.modal?.kind!=='icalImport')return;
+      ui.modal.text=text;ui.preview=null;render();
+    }catch(err){alertUser(err.message||'Could not read calendar.');}
+  }
   if(e.target.id==='backup-file'){
     try {const f=e.target.files?.[0];if(!f)return; if(f.size>10*1024*1024)throw Error('Backup exceeds 10 MB.');
       const imported=hydrate(JSON.parse(await f.text()));if(confirm('Replace current local data with this backup?'))save(imported,'Workspace restored.');
