@@ -1,16 +1,15 @@
-import {iso,addDays,nights} from './hotel.mjs';
+import {CHANNELS,iso,addDays,nights} from './hotel.mjs';
 import {iCalImportPreview,writeICal} from './calendar-exchange.mjs';
 import {dashboardNumbers,mappingAudit,rateComparison,workQueue,scheduledArrivals} from './decision-engine.mjs';
 import {TYPES,CHANNELS_EXTERNAL,fresh,hydrate,availableCount,allTypeRooms,getRule,rateFor,quoteStay,reserve,changeStatus,bulkRule,blockRoom,unblock,updateRoom,channelMap,feedRows,toCSV,importPreview,sampleCSV,availableCandidateIds} from './workspace-core.mjs';
+import {CHANNEX_BILLING, distributionOf, enqueue, enqueueChanges, HORIZON, recordDelivery, setProviderMapping, validateDistribution} from './distribution.mjs';
+import {workspaceRequest} from './workspace-connection.mjs';
 
 const STORE='homa.workspace.v2';
 const OLD='homa.hospitality.demo.v1';
 const now=iso(new Date());
-let state;
-try {
-  const raw=localStorage.getItem(STORE) || localStorage.getItem(OLD);
-  state=hydrate(raw?JSON.parse(raw):null,now);
-}catch(e){state=fresh(now);}
+const connection = {key: '', revision: null, mode: '', verified: null, busy: false};
+let state = readLocal();
 const ui={view:'overview',mobileMenu:false,start:now,days:12,modal:null,channel:'Booking.com',search:'',filter:'All',notice:'',preview:null};
 const root=document.getElementById('root');
 const money=(n)=>new Intl.NumberFormat('fr-DZ',{maximumFractionDigits:0}).format(Number(n)||0)+' DA';
@@ -48,10 +47,66 @@ const ic=(name,size=18)=>{
 };
 const navs=[['overview','grid','Control desk'],['inventory','layers','Inventory & rates'],['calendar','cal','Room calendar'],['reservations','bed','Reservations'],['distribution','globe','Channels'],['performance','chart','Performance'],['operations','log','Operations']];
 const room=(id)=>state.rooms.find(r=>r.id===id);
-function save(next,message='Saved'){
-  state=next;
-  try {localStorage.setItem(STORE,JSON.stringify(state));ui.notice=message;}
-  catch(e){ui.notice='Browser storage is unavailable. Export a backup before leaving.';}
+function readLocal() {
+  try {
+    const raw = localStorage.getItem(STORE) || localStorage.getItem(OLD);
+    return validateDistribution(hydrate(raw ? JSON.parse(raw) : null, now));
+  } catch {
+    return fresh(now);
+  }
+}
+
+function saveLocal(next, message) {
+  state = next;
+  try {
+    localStorage.setItem(STORE, JSON.stringify(state));
+    ui.notice = message;
+  } catch {
+    ui.notice = 'Browser storage is unavailable. Export a backup before leaving.';
+  }
+  render();
+}
+
+function save(next, message = 'Saved') {
+  if (connection.key) {
+    return serverAction('save', {state: next, revision: connection.revision}, message);
+  }
+  return saveLocal(enqueueChanges(state, next, now, crypto.randomUUID()), message);
+}
+
+async function serverAction(action, data, message, key = connection.key) {
+  if (connection.busy) return;
+  connection.busy = true;
+  render();
+  try {
+    const response = await workspaceRequest(key, action, data);
+    if (response.state) {
+      state = response.state;
+      connection.key = key;
+      connection.revision = response.revision;
+      connection.mode = response.mode;
+    }
+    if (action === 'verify') {
+      connection.verified = response.property;
+      message = `Channex ${response.mode} verified for ${response.property.title}.`;
+    }
+    ui.modal = null;
+    ui.preview = null;
+    ui.notice = response.message || message;
+  } catch (error) {
+    connection.busy = false;
+    render();
+    alertUser(error.message);
+    return;
+  }
+  connection.busy = false;
+  render();
+}
+
+function disconnectWorkspace() {
+  Object.assign(connection, {key: '', revision: null, mode: '', verified: null});
+  state = readLocal();
+  ui.notice = 'Returned to the browser demo.';
   render();
 }
 function alertUser(message){const d=document.querySelector?.('.dialog');if(d){let e=d.querySelector('.form-error');if(!e){e=document.createElement('div');e.className='form-error';e.setAttribute('role','alert');d.querySelector('.dialog-head').after(e);}e.textContent=message;return;}ui.notice=message;render();}
@@ -72,9 +127,11 @@ function shell(){
   button(ic('menu',17)+' Menu','toggle-menu','aria-expanded="'+(ui.mobileMenu?'true':'false')+'" aria-label="Open navigation"','mobile-menu-toggle')+'</div>'+
   '<div class="property-switch"><div class="property-initial">MO</div><div class="property-name"><strong>'+esc(state.hotelName)+'</strong><small>'+esc(state.location)+'</small></div></div>'+
   '<span class="side-heading">WORKSPACE</span><nav class="nav-list '+(ui.mobileMenu?'is-open':'')+'">'+navs.map(n=>'<button type="button" class="nav-link '+(ui.view===n[0]?'active':'')+'" data-nav="'+n[0]+'">'+ic(n[1],17)+'<span>'+esc(n[2])+'</span></button>').join('')+'</nav>'+
-  '<div class="side-bottom"><div class="local-status"><span class="tiny-square"></span>Local workspace</div><p>Data is stored in this browser. OTA accounts are not connected.</p></div></aside>'+
+  '<div class="side-bottom"><div class="local-status"><span class="tiny-square"></span>'+
+    (connection.key ? 'Shared workspace' : 'Local workspace')+'</div><p>'+
+    (connection.key ? 'Changes are saved to private storage.' : 'Demo data is saved in this browser.')+'</p></div></aside>'+
   '<div class="main"><div class="topbar"><div class="topbar-path">'+ic('hotel',17)+'<span>'+esc(state.hotelName)+'</span><span class="path-separator">/</span><strong>'+esc(navs.find(n=>n[0]===ui.view)?.[2]||'Workspace')+'</strong></div><div class="topbar-right"><span class="today-text">'+fmt(now)+' '+now.slice(0,4)+'</span>'+button(ic('add',16)+' New reservation','new-booking','','button button-primary button-small')+'</div></div>'+
-  '<main class="main-inner">'+(ui.notice?'<div class="notice" role="status">'+ic('info',16)+esc(ui.notice)+button(ic('close',14),'clear-notice','aria-label="Dismiss"','plain-icon')+'</div>':'')+renderView()+'</main></div></div>'+renderModal();
+  '<main class="main-inner">'+(connection.busy?'<div class="notice" role="status">Working…</div>':ui.notice?'<div class="notice" role="status">'+ic('info',16)+esc(ui.notice)+button(ic('close',14),'clear-notice','aria-label="Dismiss"','plain-icon')+'</div>':'')+renderView()+'</main></div></div>'+renderModal();
 }
 function dateBar(){
   return '<div class="range-navigation"><div class="range-caption">'+fmt(ui.start)+' – '+fmt(addDays(ui.start,ui.days-1))+'</div>'+
@@ -102,7 +159,7 @@ function overview(){
   const guests=arrivals.map(b=>'<button type="button" class="arrival-link" data-action="edit-booking" data-id="'+esc(b.id)+'"><span class="arrival-date"><strong>'+fmt(b.checkIn)+'</strong><small>'+weekday(b.checkIn)+'</small></span><span class="arrival-guest"><strong>'+esc(b.guest)+'</strong><small>'+esc(b.channel)+' · Room '+esc(b.roomId)+' · '+nights(b.checkIn,b.checkOut)+' nights</small></span>'+ic('arrow',15)+'</button>').join('');
   return head('Control desk','Today’s bookings, distribution setup and inventory decisions.',
     button('Edit rates '+ic('arrow',15),'go-inventory','','button button-subtle'))+
-  '<div class="desk-headline"><span>'+weekday(now)+', '+fmt(now)+' · '+now.slice(0,4)+'</span><strong>'+esc(state.hotelName)+'</strong><small>Demo data · Browser only · No connected channels</small></div>'+
+  '<div class="desk-headline"><span>'+weekday(now)+', '+fmt(now)+' · '+now.slice(0,4)+'</span><strong>'+esc(state.hotelName)+'</strong><small>'+(connection.key ? 'Private shared workspace' : 'Demo data · Browser only')+'</small></div>'+
   '<div class="metrics">'+
     metric('Occupied tonight',totalTonight.occupied+' / '+totalTonight.capacity,totalTonight.available+' rooms available tonight')+
     metric('Forward occupancy',stats.occupancy+'%','Booked room-nights · next 14 nights')+
@@ -185,9 +242,9 @@ function distribution(){
   }).join('');
   const comparisonRows=comparison.map(c=>'<tr><td><strong>'+esc(c.type)+'</strong><small>'+c.available+' rooms available</small></td><td>'+money(c.base)+'</td>'+
     c.channels.map(p=>'<td>'+money(p.rate)+'<small>'+(p.mapped?'Configured markup: '+(p.adjustment>=0?'+':'')+p.adjustment+'%':'Not mapped · Preview')+'</small></td>').join('')+'</tr>').join('');
-  return head('Channel distribution','Configure and audit what would be sent to booking channels. No real connection is active.',
+  return head('Channel distribution','Manage channel mappings, inventory delivery and reservation imports.',
     button(ic('export',16)+' Export ARI CSV','export-ari','','button button-primary'))+
-  '<div class="connection-state"><span class="connection-indicator"></span><div><strong>No channels connected</strong><p>All three OTA connections require partner-approved access, credentials and a server integration. Local mapping and exports cannot publish inventory.</p></div></div>'+
+  syncCenter()+
   '<div class="health-grid">'+cards+'</div>'+
   '<section class="surface"><div class="table-toolbar"><div><h2>Room & rate-plan mapping</h2><p>Map every internal room category to the identifiers supplied by each channel.</p></div><select id="channel-select" aria-label="Select channel">'+CHANNELS_EXTERNAL.map(c=>'<option '+(c===ui.channel?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></div>'+
   '<div class="table-scroll"><table class="register"><thead><tr><th>Internal room type</th><th>Channel plan ID</th><th>Rate adjustment</th><th>Proposed nightly rate</th><th class="right">Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></section>'+
@@ -196,6 +253,50 @@ function distribution(){
   '<section class="surface calendar-exchange"><div><h2>Manual calendar exchange</h2><p>Import or export room availability using .ics files. Exchange is not subscribed or synchronized automatically.</p></div><div class="exchange-actions">'+
   button('Import .ics','import-ical','','button button-subtle')+
   button(ic('export',16)+' Export room .ics','export-ical','','button button-subtle')+'</div></section>';
+}
+function syncCenter() {
+  const {mappings, jobs, journal} = distributionOf(state);
+  const shared = Boolean(connection.key);
+  const configured = shared && connection.mode !== 'Workspace';
+  const caption = configured ? 'Channex '+connection.mode
+    : shared ? 'Shared workspace · provider setup pending' : 'Browser demo · simulated delivery';
+  const property = connection.verified ? ' · '+esc(connection.verified.title) : '';
+  const connectControls = shared
+    ? button('Refresh workspace','refresh-workspace','','button button-subtle')+button('Sign out','disconnect-workspace','','button button-subtle')
+    : button('Open shared workspace','connect-workspace','','button button-subtle');
+  const controls = button('Queue full sync','queue-provider','','button button-subtle')+
+    button(shared ? 'Send next batch' : 'Simulate delivery','send-provider',jobs.length && (!shared || configured) ? '' : 'disabled','button button-primary')+
+    (configured ? button('Pull bookings','pull-provider','','button button-subtle') : '');
+  const mappingRows = TYPES.filter(type=>state.rooms.some(room=>room.type===type)).map(type=>{
+    const mapping = mappings[type];
+    return '<tr><td><strong>'+esc(type)+'</strong></td><td><small>'+esc(mapping?.roomId || 'Unmapped')+'</small></td>'+
+      '<td><small>'+esc(mapping?.rateId || 'Unmapped')+'</small></td><td class="right">'+
+      button('Edit','map-provider','data-type="'+esc(type)+'"','text-action')+'</td></tr>';
+  }).join('');
+  const queueRows = jobs.map(job=>'<tr><td>'+esc(job.reason)+'</td><td>'+fmt(job.from)+' – '+fmt(job.to)+'</td>'+
+    '<td><span class="status-text">'+esc(job.status)+'</span>'+(job.error ? '<small>'+esc(job.error)+'</small>' : '')+'</td>'+
+    '<td>'+esc(job.attempts)+'</td></tr>').join('');
+  const logRows = journal.slice(0, 18).map(event=>'<tr><td>'+esc(new Date(event.at).toLocaleString())+'</td><td>'+
+    esc(event.direction)+'</td><td><span class="status-text">'+esc(event.status)+'</span></td><td>'+esc(event.message)+
+    (event.tasks?.length ? '<small>'+esc(event.tasks.join(', '))+'</small>' : '')+'</td></tr>').join('');
+
+  return '<section class="surface sync-center" aria-label="Channex sync">'+
+    '<div class="surface-header"><div><h2>Channex</h2><p>'+esc(caption)+property+'</p></div><div class="exchange-actions">'+
+      '<a class="button button-subtle" href="'+CHANNEX_BILLING+'" target="_blank" rel="noopener noreferrer">Channex plans &amp; billing</a>'+
+      connectControls+(configured ? button('Check connection','verify-provider','','button button-subtle') : '')+
+    '</div></div>'+
+    '<div class="table-scroll"><table class="register"><thead><tr><th>Room category</th><th>Channex room UUID</th><th>Channex rate plan UUID</th><th class="right">Action</th></tr></thead>'+
+      '<tbody>'+mappingRows+'</tbody></table></div>'+
+  '</section>'+
+  '<section class="surface sync-center"><div class="surface-header"><div><h2>Sync queue</h2><p>Rate, restriction and inventory changes enter the queue automatically.</p></div>'+
+    '<div class="exchange-actions">'+controls+'</div></div>'+
+    '<div class="table-scroll"><table class="register"><thead><tr><th>Batch</th><th>Stay dates</th><th>Status</th><th>Failures</th></tr></thead>'+
+    '<tbody>'+(queueRows || '<tr><td colspan="4" class="empty">No changes queued.</td></tr>')+'</tbody></table></div>'+
+  '</section>'+
+  '<section class="surface sync-center"><div class="surface-header"><div><h2>Delivery journal</h2></div></div>'+
+    '<div class="table-scroll"><table class="register"><thead><tr><th>Time</th><th>Direction</th><th>Result</th><th>Detail</th></tr></thead>'+
+    '<tbody>'+(logRows || '<tr><td colspan="4" class="empty">No deliveries recorded.</td></tr>')+'</tbody></table></div>'+
+  '</section>';
 }
 function performance(){
   const stats=dashboardNumbers(state,ui.start,14);
@@ -242,7 +343,7 @@ function operations(){
     '<input type="file" id="backup-file" accept=".json,application/json" hidden></div></section>';
 }
 function selectOptions(list,selected){return list.map(item=>'<option value="'+esc(item.value||item)+'" '+((item.value||item)===selected?'selected':'')+'>'+esc(item.label||item)+'</option>').join('');}
-function field(label,name,value='',type='text',extra=''){const optional=['email','externalRef','rate','remoteId'].includes(name);return '<label class="field"><span>'+label+'</span><input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+extra+(optional?'':' required')+'></label>';}
+function field(label,name,value='',type='text',extra=''){const optional=['email','externalRef','rate','remoteId','providerRoomId','providerRateId'].includes(name);return '<label class="field"><span>'+label+'</span><input name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+extra+(optional?'':' required')+'></label>';}
 function selectField(label,name,values,chosen){return '<label class="field"><span>'+label+'</span><select name="'+name+'">'+selectOptions(values,chosen)+'</select></label>';}
 function modalShell(title,intro,body){
   return '<div class="modal-backdrop" data-action="close-modal"><section class="dialog" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><div class="dialog-head"><div><h2>'+esc(title)+'</h2><p>'+esc(intro)+'</p></div>'+button(ic('close',20),'close-modal','aria-label="Close"','plain-icon')+'</div>'+body+'</section></div>';
@@ -260,7 +361,7 @@ function bookingDialog(){
   field('Check-in','checkIn',b.checkIn,'date')+field('Check-out','checkOut',b.checkOut,'date')+
   selectField('Room','roomId',state.rooms.map(r=>({value:r.id,label:r.id+' — '+r.name+(r.status==='Maintenance'?' (maintenance)':'')})),b.roomId)+
   field('Guests','guests',b.guests,'number','min="1" max="8" step="1"')+
-  selectField('Source','channel',['Direct','Booking.com','Airbnb','Expedia','Walk-in'],b.channel)+
+  selectField('Source','channel',CHANNELS,b.channel)+
   field('External reference (optional)','externalRef',b.externalRef||'','text','placeholder="OTA booking ID"')+'</div>'+
   (existing?'<div class="edit-summary">Current status: <strong>'+esc(existing.status)+'</strong>'+ (existing.status!=='Cancelled'&&existing.status!=='Checked out'?button('Cancel reservation','cancel-booking','data-id="'+esc(existing.id)+'"','text-danger'):'')+'</div>':'')+
   modalActions(existing?'Update reservation':'Create reservation')+'</form>');
@@ -287,6 +388,22 @@ function mappingDialog(){
   field('Rate adjustment (%)','adjustment',old.adjustment,'number','min="-99" max="500" step="0.5"')+
   '<p class="form-help">Saving a mapping does not connect an account. Use the identifier provided by your channel and verify it before any future API integration.</p>'+
   modalActions('Save mapping')+'</form>');
+}
+function providerMappingDialog(){
+  const type = ui.modal.type;
+  const mapping = distributionOf(state).mappings[type];
+  return modalShell('Map Channex room and rate plan', type,
+    '<form class="dialog-form" data-form="provider-mapping">'+
+    field('Channex room type UUID','providerRoomId',mapping?.roomId || '')+
+    field('Channex rate plan UUID','providerRateId',mapping?.rateId || '')+
+    '<p class="form-help">Use the room type and its rate plan from the same Channex property.</p>'+
+    modalActions('Save mapping')+'</form>');
+}
+function workspaceDialog(){
+  return modalShell('Open shared workspace','Enter the workspace access key configured by your administrator.',
+    '<form class="dialog-form" data-form="connect-workspace">'+
+    field('Workspace access key','workspaceKey','','password','autocomplete="off" minlength="24"')+
+    modalActions('Open workspace')+'</form>');
 }
 function roomDialog(){
   const r=state.rooms.find(x=>x.id===ui.modal.id);
@@ -343,6 +460,8 @@ function renderModal(){
     case 'booking':return bookingDialog();
     case 'rule':return ruleDialog();
     case 'mapping':return mappingDialog();
+    case 'providerMapping':return providerMappingDialog();
+    case 'workspace':return workspaceDialog();
     case 'block':return blockDialog();
     case 'room':return roomDialog();
     case 'csv':return importDialog();
@@ -392,6 +511,26 @@ function action(name,el) {
       case 'edit-rule':ui.modal={kind:'rule',type:el.dataset.type,from:el.dataset.date,to:el.dataset.date};render();break;
       case 'bulk-rule':ui.modal={kind:'rule',type:'Classic',from:ui.start,to:addDays(ui.start,ui.days-1)};render();break;
       case 'map-channel':ui.modal={kind:'mapping',type:el.dataset.type};render();break;
+      case 'map-provider':ui.modal={kind:'providerMapping',type:el.dataset.type};render();break;
+      case 'connect-workspace':ui.modal={kind:'workspace'};render();break;
+      case 'disconnect-workspace':disconnectWorkspace();break;
+      case 'refresh-workspace':void serverAction('read',{},'Shared workspace refreshed.');break;
+      case 'verify-provider':void serverAction('verify',{},'');break;
+      case 'pull-provider':void serverAction('pull',{},'');break;
+      case 'queue-provider':
+        if (connection.key) void serverAction('queue',{},'Full sync queued.');
+        else saveLocal(enqueue(state,now,addDays(now,HORIZON-1),now,crypto.randomUUID(),'Full sync'),'Full sync queued for the demo.');
+        break;
+      case 'send-provider': {
+        if (connection.key) {
+          void serverAction('send',{},'');
+          break;
+        }
+        const job = distributionOf(state).jobs[0];
+        if (job) saveLocal(recordDelivery(state,[job.id],{status:'simulated',
+          message:'Demo batch processed. No changes sent to Channex.'}),'Simulated delivery recorded.');
+        break;
+      }
       case 'new-block':ui.modal={kind:'block'};render();break;
       case 'edit-room':ui.modal={kind:'room',id};render();break;
       case 'unblock':if(confirm('Remove this maintenance block?'))save(unblock(state,id),'Maintenance block removed.');break;
@@ -436,6 +575,7 @@ function action(name,el) {
   }catch(err){alertUser(err.message||'Something went wrong.');}
 }
 root.addEventListener('click',e=>{
+  if (connection.busy) return;
   const tab=e.target.closest('[data-nav]');
   if(tab){e.preventDefault();setView(tab.dataset.nav);return;}
   const trigger=e.target.closest('[data-action]');
@@ -457,7 +597,7 @@ root.addEventListener('change',async e=>{
   }
   if(e.target.id==='backup-file'){
     try {const f=e.target.files?.[0];if(!f)return; if(f.size>10*1024*1024)throw Error('Backup exceeds 10 MB.');
-      const imported=hydrate(JSON.parse(await f.text()));if(confirm('Replace current local data with this backup?'))save(imported,'Workspace restored.');
+      const imported=validateDistribution(hydrate(JSON.parse(await f.text())));if(confirm('Replace the current workspace with this backup?'))save(imported,'Workspace restored.');
     }catch(err){alertUser(err.message||'Could not restore backup.');}
   }
 });
@@ -467,10 +607,18 @@ root.addEventListener('input',e=>{
   filterReservationRows();
 });
 root.addEventListener('submit',e=>{
+  if (connection.busy) {e.preventDefault();return;}
   const form=e.target.closest('[data-form]');if(!form)return;
   e.preventDefault();
   const data=new FormData(form),v=Object.fromEntries(data.entries());
   try {
+    if(form.dataset.form==='connect-workspace'){
+      void serverAction('read',{},'Shared workspace opened.',v.workspaceKey.trim());return;
+    }
+    if(form.dataset.form==='provider-mapping'){
+      const next=setProviderMapping(state,ui.modal.type,v.providerRoomId.trim(),v.providerRateId.trim());
+      ui.modal=null;save(next,'Channex mapping saved.');return;
+    }
     if(form.dataset.form==='booking'){
       const id=ui.modal.id;const original=state.bookings.find(b=>b.id===id);
       const item={...original,...v,guests:Number(v.guests),status:original?.status||'Confirmed',externalRef:String(v.externalRef||'').trim(),rate:original?.rate??undefined};

@@ -355,3 +355,29 @@ h1,h2,h3,p{margin:0}
  .reports-aside .register{min-width:0}
  .reports-aside .register th,.reports-aside .register td{padding:10px 7px;font-size:10px}
 }
+
+.sync-center {
+  margin-block: 16px;
+}
+
+.sync-center .surface-header {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sync-center .register td {
+  overflow-wrap: anywhere;
+}
+
+.exchange-actions {
+  flex-wrap: wrap;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+a.button {
+  text-decoration: none;
+}

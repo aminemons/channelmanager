@@ -82,7 +82,7 @@ export function quoteStay(state,type,start,end) {
   for(let day=start;day<end;day=addDays(day,1))total+=rateFor(state,type,day);
   return total;
 }
-export function validateStay(state,booking,exceptId=null) {
+export function validateStay(state,booking,exceptId=null,{external=false}={}) {
   if(!booking.guest||str(booking.guest).length<2)return 'Enter a guest name.';
   if(!isDate(booking.checkIn)||!isDate(booking.checkOut)||nights(booking.checkIn,booking.checkOut)<1||nights(booking.checkIn,booking.checkOut)>90)return 'Choose a valid stay between 1 and 90 nights.';
   if(!state.rooms.some(r=>r.id===booking.roomId))return 'Choose a room.';
@@ -93,22 +93,24 @@ export function validateStay(state,booking,exceptId=null) {
   if(booking.status==='Cancelled')return null;
   const room=state.rooms.find(r=>r.id===booking.roomId);
   if(room.status==='Maintenance')return 'This room is in maintenance.';
-  const atArrival=getRule(state,room.type,booking.checkIn);
-  const atDeparture=getRule(state,room.type,booking.checkOut);
-  if(nights(booking.checkIn,booking.checkOut)<atArrival.minStay)return 'Minimum stay is '+atArrival.minStay+' nights.';
-  if(atArrival.cta)return 'Arrival is closed on this date.';
-  if(atDeparture.ctd)return 'Departure is closed on this date.';
-  for(let day=booking.checkIn;day<booking.checkOut;day=addDays(day,1)){
-    if(getRule(state,room.type,day).stopSell)return 'Sales are closed for '+day+'.';
+  if (!external) {
+    const atArrival=getRule(state,room.type,booking.checkIn);
+    const atDeparture=getRule(state,room.type,booking.checkOut);
+    if(nights(booking.checkIn,booking.checkOut)<atArrival.minStay)return 'Minimum stay is '+atArrival.minStay+' nights.';
+    if(atArrival.cta)return 'Arrival is closed on this date.';
+    if(atDeparture.ctd)return 'Departure is closed on this date.';
+    for(let day=booking.checkIn;day<booking.checkOut;day=addDays(day,1)){
+      if(getRule(state,room.type,day).stopSell)return 'Sales are closed for '+day+'.';
+    }
   }
   if(state.bookings.some(b=>b.id!==exceptId&&b.status!=='Cancelled'&&b.roomId===booking.roomId&&intersects(b.checkIn,b.checkOut,booking.checkIn,booking.checkOut))) return 'Room is already reserved for these dates.';
   if(state.blocks.some(b=>b.roomId===booking.roomId&&intersects(b.start,b.end,booking.checkIn,booking.checkOut)))return 'Room is blocked for maintenance during these dates.';
   if(booking.externalRef&&state.bookings.some(b=>b.id!==exceptId&&b.channel===booking.channel&&b.externalRef===booking.externalRef)) return 'Duplicate channel reservation reference.';
   return null;
 }
-export function reserve(state,booking,exceptId=null) {
+export function reserve(state,booking,exceptId=null,options) {
   const next=deep(state);
-  const err=validateStay(next,booking,exceptId);
+  const err=validateStay(next,booking,exceptId,options);
   if(err) throw new Error(err);
   const target=exceptId?next.bookings.find(b=>b.id===exceptId):null;
   if(exceptId&&!target)throw new Error('Reservation no longer exists.');

@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "HOMA — local hotel ARI and reservation operations workspace",
+  "description": "HOMA \u2014 local hotel ARI and reservation operations workspace",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check hotel.mjs && node --check app.js && node --check workspace-core.mjs && node --check calendar-exchange.mjs && node --check decision-engine.mjs && node --check workspace.js && node --check scripts/build-netlify.mjs && node --check scripts/serve.mjs",
+    "check": "node --check hotel.mjs && node --check app.js && node --check workspace-core.mjs && node --check calendar-exchange.mjs && node --check decision-engine.mjs && node --check workspace.js && node --check scripts/build-netlify.mjs && node --check scripts/serve.mjs && node --check distribution.mjs && node --check workspace-connection.mjs && node --check api/channel-sync.js && node --check server/channex.mjs && node --check server/channel-workspace.mjs && node --check server/workspace-store.mjs",
     "start": "node scripts/serve.mjs",
     "build:netlify": "node scripts/build-netlify.mjs"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "@vercel/blob": "2.9.0"
+  }
 }

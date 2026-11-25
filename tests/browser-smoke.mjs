@@ -27,7 +27,7 @@ try {
  if(await page.locator('h1').count()===0){console.error('BROWSER PAGE ERRORS:',errors);console.error('BODY:',(await page.locator('body').innerHTML()).slice(0,1600));throw new Error('Dashboard did not render.');}
  assert.equal(await page.locator('h1').innerText(),'Control desk');
  assert.ok(await page.locator('.queue-row').count()>0);
- assert.equal(await page.locator('.desk-headline small').innerText(),'Demo data · Browser only · No connected channels');
+ assert.equal(await page.locator('.desk-headline small').innerText(),'Demo data · Browser only');
  await page.screenshot({path:'artifacts/browser/01-control-desk-desktop.png',fullPage:true});
  console.log('PASS control desk, action queue and browser-only status');
 

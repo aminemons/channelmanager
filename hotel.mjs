@@ -2,7 +2,7 @@
  * Checkout is EXCLUSIVE: a stay ending on 2026-11-23 frees the room on Nov 23.
  * No real OTA integration or payment processing is implemented here.
  */
-export const CHANNELS = ['Direct', 'Booking.com', 'Airbnb', 'Expedia', 'Walk-in'];
+export const CHANNELS = ['Direct', 'Booking.com', 'Airbnb', 'Expedia', 'Walk-in', 'Channex'];
 export const STATUSES = ['Confirmed', 'Checked in', 'Checked out', 'Cancelled'];
 export const DAY = 86400000;
 export const iso = date => `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
